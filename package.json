@@ -923,7 +923,7 @@
         "@types/vscode": "~1.90.0",
         "@vscode/codicons": "^0.0.45",
         "@vscode/vsce": "^4.1.0",
-        "esbuild": "^0.25.0",
+        "esbuild": "^0.28.2",
         "fast-check": "4.10.2",
         "prettier": "^3.9.10",
         "typescript": "^5.6.0"

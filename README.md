@@ -1,5 +1,15 @@
 # Simics Target Debug for VS Code
 
+<table border="0">
+  <tr>
+    <td align="left" border="0" valign="middle">
+      <a href="https://github.com/intel/simics-vs-code-tcf-debug/actions/workflows/test.yml"><img src="https://github.com/intel/simics-vs-code-tcf-debug/actions/workflows/test.yml/badge.svg" alt="Tests" align="middle"></a>&nbsp;
+      <a href="LICENSE.md"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT" align="middle"></a>&nbsp;
+      <a href="https://scorecard.dev/viewer/?uri=github.com/intel/simics-vs-code-tcf-debug"><img src="https://api.securityscorecards.dev/projects/github.com/intel/simics-vs-code-tcf-debug/badge" alt="OpenSSF Scorecard" align="middle"></a>
+    </td>
+  </tr>
+</table>
+
 A VS Code debugger extension that connects to a
 [TCF](https://download.eclipse.org/tools/tcf/tcf-docs/) agent, for example the
 Simics TCF agent. It only uses standard TCF services (`Locator`, `RunControl`,

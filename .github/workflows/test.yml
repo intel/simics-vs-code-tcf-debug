@@ -5,6 +5,8 @@ on:
         branches: [main, plugin-from-scatch]
     pull_request:
     workflow_dispatch:
+    schedule:
+        - cron: "17 3 * * 1"
 
 permissions:
     contents: read

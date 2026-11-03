@@ -905,6 +905,7 @@
         "typecheck": "tsc --noEmit -p . && tsc --noEmit -p tsconfig.webview.json && tsc --noEmit -p src/launchSettings/webview",
         "format": "prettier --write .",
         "test": "node esbuild.mjs --tests && node --enable-source-maps --test \"out/test/*.test.js\"",
+        "test:fuzz": "node esbuild.mjs --tests && node --enable-source-maps --test out/test/fuzzing.test.js",
         "vscode:prepublish": "npm run typecheck && npm run compile:production",
         "package": "vsce package --no-dependencies"
     },
@@ -923,6 +924,7 @@
         "@vscode/codicons": "^0.0.45",
         "@vscode/vsce": "^4.1.0",
         "esbuild": "^0.25.0",
+        "fast-check": "4.10.2",
         "prettier": "^3.9.10",
         "typescript": "^5.6.0"
     }

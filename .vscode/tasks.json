@@ -1,0 +1,21 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build extension (and watch for changes)",
+            "type": "npm",
+            "script": "watch",
+            "isBackground": true,
+            "presentation": { "reveal": "never" },
+            "group": { "kind": "build", "isDefault": true },
+            "problemMatcher": {
+                "base": "$tsc",
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": "^Build started\\.$",
+                    "endsPattern": "^Build complete; watching for changes\\.$"
+                }
+            }
+        }
+    ]
+}

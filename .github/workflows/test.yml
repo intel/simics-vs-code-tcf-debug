@@ -1,0 +1,28 @@
+name: Tests
+
+on:
+    push:
+        branches: [main, plugin-from-scatch]
+    pull_request:
+    workflow_dispatch:
+
+env:
+    http_proxy: http://proxy-mu.intel.com:912
+    https_proxy: http://proxy-mu.intel.com:912
+    NODE_PATH: /usr/itm/node/24.21.0/bin
+
+permissions:
+    contents: read
+
+jobs:
+    extension-tests:
+        runs-on: [self-hosted, gklab, linux, shared]
+        steps:
+            - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+              with:
+                  persist-credentials: false
+            - name: Set up path for node/npm
+              run: echo "${{ env.NODE_PATH }}" >> "$GITHUB_PATH"
+            - run: npm ci
+            - run: npm run typecheck
+            - run: npm test

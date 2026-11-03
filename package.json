@@ -1,0 +1,929 @@
+{
+    "name": "simics-target-debug",
+    "displayName": "Simics Target Debug",
+    "description": "Debug targets through a Target Communication Framework (TCF) agent, such as the Simics TCF agent.",
+    "version": "1.0.0",
+    "publisher": "intel-simics",
+    "private": true,
+    "license": "MIT",
+    "repository": {
+        "url": "https://github.com/intel-innersource/applications.simulators.simics.base.hackathon"
+    },
+    "engines": {
+        "vscode": "^1.90.0"
+    },
+    "categories": [
+        "Debuggers"
+    ],
+    "main": "./out/extension.js",
+    "activationEvents": [
+        "onDebugResolve:simics-target-debug"
+    ],
+    "contributes": {
+        "commands": [
+            {
+                "command": "simics-target-debug.addPathMapRule",
+                "title": "Add Path Map Rule...",
+                "category": "Simics Target Debug",
+                "icon": "$(add)"
+            },
+            {
+                "command": "simics-target-debug.editPathMapRule",
+                "title": "Edit Path Map Rule...",
+                "category": "Simics Target Debug",
+                "icon": "$(edit)"
+            },
+            {
+                "command": "simics-target-debug.removePathMapRule",
+                "title": "Remove Path Map Rule",
+                "category": "Simics Target Debug",
+                "icon": "$(trash)"
+            },
+            {
+                "command": "simics-target-debug.movePathMapRuleUp",
+                "title": "Move Rule Up",
+                "category": "Simics Target Debug",
+                "icon": "$(arrow-up)"
+            },
+            {
+                "command": "simics-target-debug.movePathMapRuleDown",
+                "title": "Move Rule Down",
+                "category": "Simics Target Debug",
+                "icon": "$(arrow-down)"
+            },
+            {
+                "command": "simics-target-debug.savePathMap",
+                "title": "Save Path Map to Debug Configuration",
+                "category": "Simics Target Debug",
+                "icon": "$(save)"
+            },
+            {
+                "command": "simics-target-debug.refreshPathMap",
+                "title": "Refresh Path Map",
+                "category": "Simics Target Debug",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "simics-target-debug.openLaunchSettings",
+                "title": "Edit Launch Configurations",
+                "category": "Simics Target Debug",
+                "icon": "$(settings-gear)"
+            },
+            {
+                "command": "simics-target-debug.openLaunchJson",
+                "title": "Open launch.json as Text",
+                "category": "Simics Target Debug",
+                "icon": "$(json)"
+            },
+            {
+                "command": "simics-target-debug.locateSourceFile",
+                "title": "Locate Source File...",
+                "category": "Simics Target Debug",
+                "icon": "$(search)"
+            },
+            {
+                "command": "simics-target-debug.addSymbolFile",
+                "title": "Add Symbol File...",
+                "category": "Simics Target Debug",
+                "icon": "$(add)"
+            },
+            {
+                "command": "simics-target-debug.editSymbolFile",
+                "title": "Edit Symbol Mapping...",
+                "category": "Simics Target Debug",
+                "icon": "$(edit)"
+            },
+            {
+                "command": "simics-target-debug.removeSymbolFile",
+                "title": "Remove Symbol File",
+                "category": "Simics Target Debug",
+                "icon": "$(trash)"
+            },
+            {
+                "command": "simics-target-debug.reloadSymbolFile",
+                "title": "Reload Symbol File",
+                "category": "Simics Target Debug",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "simics-target-debug.saveSymbolFiles",
+                "title": "Save Symbol Files to Debug Configuration",
+                "category": "Simics Target Debug",
+                "icon": "$(save)"
+            },
+            {
+                "command": "simics-target-debug.reloadSymbolFiles",
+                "title": "Reload All Symbol Files",
+                "category": "Simics Target Debug",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "simics-target-debug.copyFrameAddress",
+                "title": "Copy Address",
+                "category": "Simics Target Debug"
+            },
+            {
+                "command": "simics-target-debug.openTargetMemory",
+                "title": "Open Target Memory",
+                "category": "Simics Target Debug",
+                "icon": "$(circuit-board)"
+            },
+            {
+                "command": "simics-target-debug.newTargetMemory",
+                "title": "New Target Memory View",
+                "category": "Simics Target Debug",
+                "icon": "$(add)"
+            },
+            {
+                "command": "simics-target-debug.openVariableInTargetMemory",
+                "title": "Open in Target Memory",
+                "category": "Simics Target Debug"
+            },
+            {
+                "command": "simics-target-debug.targetMemory.copy",
+                "title": "Copy"
+            },
+            {
+                "command": "simics-target-debug.targetMemory.copyText",
+                "title": "Copy as Text"
+            },
+            {
+                "command": "simics-target-debug.targetMemory.copyAddress",
+                "title": "Copy Address"
+            },
+            {
+                "command": "simics-target-debug.targetMemory.goto",
+                "title": "Go to Address..."
+            },
+            {
+                "command": "simics-target-debug.targetMemory.find",
+                "title": "Find..."
+            },
+            {
+                "command": "simics-target-debug.targetMemory.refresh",
+                "title": "Read Memory Again"
+            },
+            {
+                "command": "simics-target-debug.openConsole",
+                "title": "Open Simics Console",
+                "category": "Simics Target Debug",
+                "icon": "$(terminal)"
+            },
+            {
+                "command": "simics-target-debug.showConsole",
+                "title": "Show Console",
+                "category": "Simics Target Debug"
+            },
+            {
+                "command": "simics-target-debug.connectConsole",
+                "title": "Connect",
+                "category": "Simics Target Debug",
+                "icon": "$(plug)"
+            },
+            {
+                "command": "simics-target-debug.reconnectConsole",
+                "title": "Reconnect",
+                "category": "Simics Target Debug",
+                "icon": "$(debug-restart)"
+            },
+            {
+                "command": "simics-target-debug.clearConsoleHistory",
+                "title": "Clear History",
+                "category": "Simics Target Debug",
+                "icon": "$(clear-all)",
+                "enablement": "viewItem =~ /\\bhistory\\b/"
+            },
+            {
+                "command": "simics-target-debug.consoleKeysToVsCode",
+                "title": "Editing keys such as Ctrl+P go to Simics. Click to leave them to VS Code (editingKeys in launch.json)",
+                "category": "Simics Target Debug",
+                "icon": "$(lock)"
+            },
+            {
+                "command": "simics-target-debug.consoleKeysToSimics",
+                "title": "Editing keys such as Ctrl+P go to VS Code. Click to send them to Simics (editingKeys in launch.json)",
+                "category": "Simics Target Debug",
+                "icon": "$(unlock)"
+            }
+        ],
+        "views": {
+            "debug": [
+                {
+                    "id": "simics-target-debug.pathMap",
+                    "name": "Path Maps",
+                    "icon": "$(replace-all)",
+                    "when": "debugType == simics-target-debug"
+                },
+                {
+                    "id": "simics-target-debug.symbolFiles",
+                    "name": "Symbol Files",
+                    "icon": "$(file-code)",
+                    "when": "debugType == simics-target-debug"
+                },
+                {
+                    "id": "simics-target-debug.consoles",
+                    "name": "Consoles",
+                    "icon": "$(terminal)",
+                    "when": "debugType == simics-target-debug || simics-target-debug.hasConsoles"
+                }
+            ]
+        },
+        "viewsWelcome": [
+            {
+                "view": "simics-target-debug.consoles",
+                "contents": "No console. The Simics CLI is listed here when the agent has the Simics CommandLine service."
+            }
+        ],
+        "menus": {
+            "commandPalette": [
+                {
+                    "command": "simics-target-debug.saveSymbolFiles",
+                    "when": "debugType == simics-target-debug"
+                },
+                {
+                    "command": "simics-target-debug.addPathMapRule",
+                    "when": "debugType == simics-target-debug"
+                },
+                {
+                    "command": "simics-target-debug.savePathMap",
+                    "when": "debugType == simics-target-debug"
+                },
+                {
+                    "command": "simics-target-debug.refreshPathMap",
+                    "when": "debugType == simics-target-debug"
+                },
+                {
+                    "command": "simics-target-debug.editPathMapRule",
+                    "when": "false"
+                },
+                {
+                    "command": "simics-target-debug.removePathMapRule",
+                    "when": "false"
+                },
+                {
+                    "command": "simics-target-debug.movePathMapRuleUp",
+                    "when": "false"
+                },
+                {
+                    "command": "simics-target-debug.movePathMapRuleDown",
+                    "when": "false"
+                },
+                {
+                    "command": "simics-target-debug.locateSourceFile",
+                    "when": "debugType == simics-target-debug"
+                },
+                {
+                    "command": "simics-target-debug.openLaunchJson",
+                    "when": "activeCustomEditorId == simics-target-debug.launchSettings"
+                },
+                {
+                    "command": "simics-target-debug.copyFrameAddress",
+                    "when": "false"
+                },
+                {
+                    "command": "simics-target-debug.openVariableInTargetMemory",
+                    "when": "false"
+                },
+                {
+                    "command": "simics-target-debug.targetMemory.copy",
+                    "when": "false"
+                },
+                {
+                    "command": "simics-target-debug.targetMemory.copyText",
+                    "when": "false"
+                },
+                {
+                    "command": "simics-target-debug.targetMemory.copyAddress",
+                    "when": "false"
+                },
+                {
+                    "command": "simics-target-debug.targetMemory.goto",
+                    "when": "false"
+                },
+                {
+                    "command": "simics-target-debug.targetMemory.find",
+                    "when": "false"
+                },
+                {
+                    "command": "simics-target-debug.targetMemory.refresh",
+                    "when": "false"
+                },
+                {
+                    "command": "simics-target-debug.showConsole",
+                    "when": "false"
+                },
+                {
+                    "command": "simics-target-debug.connectConsole",
+                    "when": "false"
+                },
+                {
+                    "command": "simics-target-debug.reconnectConsole",
+                    "when": "false"
+                },
+                {
+                    "command": "simics-target-debug.clearConsoleHistory",
+                    "when": "false"
+                },
+                {
+                    "command": "simics-target-debug.consoleKeysToVsCode",
+                    "when": "false"
+                },
+                {
+                    "command": "simics-target-debug.consoleKeysToSimics",
+                    "when": "false"
+                }
+            ],
+            "editor/title": [
+                {
+                    "command": "simics-target-debug.openLaunchSettings",
+                    "when": "resourcePath =~ /[\\\\/]\\.vscode[\\\\/]launch\\.json$/ && activeCustomEditorId != simics-target-debug.launchSettings",
+                    "group": "navigation"
+                },
+                {
+                    "command": "simics-target-debug.openLaunchJson",
+                    "when": "activeCustomEditorId == simics-target-debug.launchSettings",
+                    "group": "navigation"
+                },
+                {
+                    "command": "simics-target-debug.newTargetMemory",
+                    "when": "activeWebviewPanelId == 'simics-target-debug.targetMemory'",
+                    "group": "navigation"
+                }
+            ],
+            "webview/context": [
+                {
+                    "command": "simics-target-debug.targetMemory.copy",
+                    "when": "webviewId == 'simics-target-debug.targetMemory' && webviewSection == 'grid'",
+                    "group": "1_copy@1"
+                },
+                {
+                    "command": "simics-target-debug.targetMemory.copyText",
+                    "when": "webviewId == 'simics-target-debug.targetMemory' && webviewSection == 'grid'",
+                    "group": "1_copy@2"
+                },
+                {
+                    "command": "simics-target-debug.targetMemory.copyAddress",
+                    "when": "webviewId == 'simics-target-debug.targetMemory' && webviewSection == 'grid'",
+                    "group": "1_copy@3"
+                },
+                {
+                    "command": "simics-target-debug.targetMemory.goto",
+                    "when": "webviewId == 'simics-target-debug.targetMemory' && webviewSection == 'grid'",
+                    "group": "2_navigate@1"
+                },
+                {
+                    "command": "simics-target-debug.targetMemory.find",
+                    "when": "webviewId == 'simics-target-debug.targetMemory' && webviewSection == 'grid'",
+                    "group": "2_navigate@2"
+                },
+                {
+                    "command": "simics-target-debug.targetMemory.refresh",
+                    "when": "webviewId == 'simics-target-debug.targetMemory' && webviewSection == 'grid'",
+                    "group": "3_refresh@1"
+                }
+            ],
+            "view/title": [
+                {
+                    "command": "simics-target-debug.openConsole",
+                    "when": "view == simics-target-debug.consoles && debugType == simics-target-debug && !simics-target-debug.hasConsoles",
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "simics-target-debug.saveSymbolFiles",
+                    "when": "view == simics-target-debug.symbolFiles",
+                    "group": "navigation@2"
+                },
+                {
+                    "command": "simics-target-debug.addPathMapRule",
+                    "when": "view == simics-target-debug.pathMap",
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "simics-target-debug.savePathMap",
+                    "when": "view == simics-target-debug.pathMap",
+                    "group": "navigation@2"
+                },
+                {
+                    "command": "simics-target-debug.refreshPathMap",
+                    "when": "view == simics-target-debug.pathMap",
+                    "group": "navigation@3"
+                },
+                {
+                    "command": "simics-target-debug.addSymbolFile",
+                    "when": "view == simics-target-debug.symbolFiles",
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "simics-target-debug.reloadSymbolFiles",
+                    "when": "view == simics-target-debug.symbolFiles",
+                    "group": "navigation@3"
+                }
+            ],
+            "view/item/context": [
+                {
+                    "command": "simics-target-debug.connectConsole",
+                    "when": "view == simics-target-debug.consoles && viewItem =~ /\\bconnect\\b/",
+                    "group": "inline@0"
+                },
+                {
+                    "command": "simics-target-debug.reconnectConsole",
+                    "when": "view == simics-target-debug.consoles && viewItem =~ /\\breconnect\\b/",
+                    "group": "inline@0"
+                },
+                {
+                    "command": "simics-target-debug.consoleKeysToVsCode",
+                    "when": "view == simics-target-debug.consoles && viewItem =~ /\\bkeysToSimics\\b/",
+                    "group": "inline@0"
+                },
+                {
+                    "command": "simics-target-debug.consoleKeysToSimics",
+                    "when": "view == simics-target-debug.consoles && viewItem =~ /\\bkeysToVsCode\\b/",
+                    "group": "inline@0"
+                },
+                {
+                    "command": "simics-target-debug.clearConsoleHistory",
+                    "when": "view == simics-target-debug.consoles && viewItem =~ /^simicsCli/",
+                    "group": "inline@1"
+                },
+                {
+                    "command": "simics-target-debug.editPathMapRule",
+                    "when": "view == simics-target-debug.pathMap && viewItem == pathMapRule",
+                    "group": "inline@1"
+                },
+                {
+                    "command": "simics-target-debug.removePathMapRule",
+                    "when": "view == simics-target-debug.pathMap && viewItem == pathMapRule",
+                    "group": "inline@2"
+                },
+                {
+                    "command": "simics-target-debug.movePathMapRuleUp",
+                    "when": "view == simics-target-debug.pathMap && viewItem == pathMapRule",
+                    "group": "order@1"
+                },
+                {
+                    "command": "simics-target-debug.movePathMapRuleDown",
+                    "when": "view == simics-target-debug.pathMap && viewItem == pathMapRule",
+                    "group": "order@2"
+                },
+                {
+                    "command": "simics-target-debug.editSymbolFile",
+                    "when": "view == simics-target-debug.symbolFiles && viewItem == symbolFile",
+                    "group": "inline@1"
+                },
+                {
+                    "command": "simics-target-debug.reloadSymbolFile",
+                    "when": "view == simics-target-debug.symbolFiles && viewItem == symbolFile",
+                    "group": "inline@2"
+                },
+                {
+                    "command": "simics-target-debug.removeSymbolFile",
+                    "when": "view == simics-target-debug.symbolFiles && viewItem == symbolFile",
+                    "group": "inline@3"
+                }
+            ],
+            "debug/toolBar": [
+                {
+                    "command": "simics-target-debug.openTargetMemory",
+                    "when": "debugType == 'simics-target-debug'"
+                }
+            ],
+            "debug/callstack/context": [
+                {
+                    "command": "simics-target-debug.copyFrameAddress",
+                    "when": "debugType == 'simics-target-debug' && callStackItemType == 'stackFrame'",
+                    "group": "3_modification"
+                }
+            ],
+            "debug/variables/context": [
+                {
+                    "command": "simics-target-debug.openVariableInTargetMemory",
+                    "when": "debugType == 'simics-target-debug'"
+                }
+            ]
+        },
+        "keybindings": [
+            {
+                "command": "simics-target-debug.targetMemory.goto",
+                "key": "ctrl+g",
+                "when": "activeWebviewPanelId == 'simics-target-debug.targetMemory'"
+            },
+            {
+                "command": "simics-target-debug.targetMemory.find",
+                "key": "ctrl+f",
+                "mac": "cmd+f",
+                "when": "activeWebviewPanelId == 'simics-target-debug.targetMemory'"
+            },
+            {
+                "command": "workbench.action.terminal.sendSequence",
+                "key": "ctrl+e",
+                "args": {
+                    "text": "\u0005"
+                },
+                "when": "terminalFocus && simics-target-debug.editingKeys"
+            },
+            {
+                "command": "workbench.action.terminal.sendSequence",
+                "key": "ctrl+f",
+                "args": {
+                    "text": "\u0006"
+                },
+                "when": "terminalFocus && simics-target-debug.editingKeys"
+            },
+            {
+                "command": "workbench.action.terminal.sendSequence",
+                "key": "ctrl+g",
+                "args": {
+                    "text": "\u0007"
+                },
+                "when": "terminalFocus && simics-target-debug.editingKeys"
+            },
+            {
+                "command": "workbench.action.terminal.sendSequence",
+                "key": "ctrl+k",
+                "args": {
+                    "text": "\u000b"
+                },
+                "when": "terminalFocus && simics-target-debug.editingKeys"
+            },
+            {
+                "command": "workbench.action.terminal.sendSequence",
+                "key": "ctrl+p",
+                "args": {
+                    "text": "\u0010"
+                },
+                "when": "terminalFocus && simics-target-debug.editingKeys"
+            },
+            {
+                "command": "workbench.action.terminal.sendSequence",
+                "key": "ctrl+r",
+                "args": {
+                    "text": "\u0012"
+                },
+                "when": "terminalFocus && simics-target-debug.editingKeys"
+            },
+            {
+                "command": "workbench.action.terminal.sendSequence",
+                "key": "ctrl+w",
+                "args": {
+                    "text": "\u0017"
+                },
+                "when": "terminalFocus && simics-target-debug.editingKeys"
+            },
+            {
+                "command": "workbench.action.terminal.sendSequence",
+                "key": "ctrl+shift+-",
+                "args": {
+                    "text": "\u001f"
+                },
+                "when": "terminalFocus && simics-target-debug.editingKeys && isWindows"
+            }
+        ],
+        "customEditors": [
+            {
+                "viewType": "simics-target-debug.launchSettings",
+                "displayName": "TCF Launch Configurations",
+                "selector": [
+                    {
+                        "filenamePattern": "**/.vscode/launch.json"
+                    }
+                ],
+                "priority": "option"
+            }
+        ],
+        "debuggers": [
+            {
+                "type": "simics-target-debug",
+                "label": "Simics Target Debug",
+                "configurationAttributes": {
+                    "attach": {
+                        "properties": {
+                            "host": {
+                                "type": "string",
+                                "description": "Host name or IP address of the TCF agent.",
+                                "default": "localhost"
+                            },
+                            "port": {
+                                "type": "number",
+                                "description": "TCP port of the TCF agent.",
+                                "default": 1534
+                            },
+                            "connectTimeout": {
+                                "type": "number",
+                                "description": "Timeout in milliseconds for connecting and receiving the agent's Locator.Hello.",
+                                "default": 10000
+                            },
+                            "symbolFiles": {
+                                "type": "array",
+                                "description": "Symbol files (ELF with debug information) to add to the agent's memory map (MemoryMap service) when attaching. They are removed when the debug session ends.",
+                                "items": {
+                                    "type": "object",
+                                    "required": [
+                                        "path"
+                                    ],
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "path": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "format": "file-path",
+                                            "description": "Path of the symbol file, as seen by the agent. Relative paths are relative to the workspace folder."
+                                        },
+                                        "context": {
+                                            "type": "string",
+                                            "description": "ID or name of the context the symbols apply to. If neither context nor contextQuery is set, the symbols apply to all contexts."
+                                        },
+                                        "contextQuery": {
+                                            "type": "string",
+                                            "description": "TCF context query selecting the contexts the symbols apply to, for example \"**/HasState=true\"."
+                                        },
+                                        "address": {
+                                            "type": [
+                                                "string",
+                                                "integer"
+                                            ],
+                                            "description": "Relocation offset added to all addresses in the file, like the Simics command add-symbol-file -relative, for example \"0x1000\" or \"-0x1000\". With \"absolute\", the load address of the file's loadable segment with the lowest file offset (normally the first one) instead. If not set, the addresses in the file are used."
+                                        },
+                                        "absolute": {
+                                            "type": "boolean",
+                                            "description": "Treat \"address\" as an absolute load address: the symbols are relocated so that the file's loadable segment with the lowest file offset (normally the first one) is at this address.",
+                                            "default": false
+                                        }
+                                    }
+                                },
+                                "default": [
+                                    {
+                                        "path": "${workspaceFolder}/build/firmware.elf"
+                                    }
+                                ]
+                            },
+                            "pathMap": {
+                                "type": "array",
+                                "description": "Maps source paths in the debug information to paths on this host. Matching rules are tried in order, the first mapped file that exists is used. Rules apply to all contexts unless context or contextQuery selects a subset. The rules are also sent to the agent (PathMap service), so breakpoints can be set on host paths.",
+                                "items": {
+                                    "type": "object",
+                                    "required": [
+                                        "source",
+                                        "destination"
+                                    ],
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "source": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "description": "Path prefix as compiled into the debug information, for example the build directory."
+                                        },
+                                        "destination": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "format": "file-or-folder-path",
+                                            "description": "Corresponding path prefix on this host, for example ${workspaceFolder}."
+                                        },
+                                        "context": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "description": "Exact context ID. Sent to PathMap.set as ContextQuery=\"ID=<id>\". Use either context or contextQuery, not both. Omit both to apply to all contexts."
+                                        },
+                                        "contextQuery": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "description": "TCF context query selecting a group of contexts, for example \"**/HasState=true\" or \"ID=cpu0\". Sent as the ContextQuery property of PathMap.set. Use either context or contextQuery, not both."
+                                        }
+                                    }
+                                },
+                                "default": [
+                                    {
+                                        "source": "/build/src",
+                                        "destination": "${workspaceFolder}"
+                                    }
+                                ]
+                            },
+                            "consoles": {
+                                "type": "object",
+                                "description": "Consoles opened with the debug session.",
+                                "additionalProperties": false,
+                                "properties": {
+                                    "simicsCli": {
+                                        "type": "object",
+                                        "description": "The Simics command line (Simics CLI), if the agent has the CommandLine service.",
+                                        "additionalProperties": false,
+                                        "properties": {
+                                            "open": {
+                                                "type": "boolean",
+                                                "description": "Open the Simics CLI after attaching. When off, open it from the Consoles view.",
+                                                "default": true
+                                            },
+                                            "historySessions": {
+                                                "type": "integer",
+                                                "minimum": 0,
+                                                "description": "How many earlier sessions with the same agent to show above the command line. 0 turns it off.",
+                                                "default": 3
+                                            },
+                                            "editingKeys": {
+                                                "type": "boolean",
+                                                "description": "Send keys such as Ctrl+P and Ctrl+R to Simics instead of VS Code while the Simics CLI has focus.",
+                                                "default": true
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            "traceTcf": {
+                                "type": "boolean",
+                                "description": "Log TCF traffic to the Output view, in the \"Simics Target Debug\" log. traceTcfSilence selects messages to leave out.",
+                                "default": false
+                            },
+                            "traceTcfSilence": {
+                                "type": "array",
+                                "description": "TCF messages left out of the traceTcf log. Each item silences the messages of a service with one of the given types and a name. \"*\" matches anything. A command's results (R, P and N) count as the command. Flow control messages have no service or name, so only items with \"*\" for both match them. If not set, Locator peer events (such as the heartbeat) and the Simics CLI (CommandLine) are silenced. An empty list logs everything.",
+                                "items": {
+                                    "type": "object",
+                                    "required": [
+                                        "service"
+                                    ],
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "service": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "description": "TCF service, for example CommandLine, Locator, RunControl or Breakpoints, or \"*\" for all.",
+                                            "examples": [
+                                                "*",
+                                                "Breakpoints",
+                                                "CommandLine",
+                                                "ContextQuery",
+                                                "ContextReset",
+                                                "Disassembly",
+                                                "DPrintf",
+                                                "Expressions",
+                                                "ITP",
+                                                "LineNumbers",
+                                                "Locator",
+                                                "Memory",
+                                                "MemoryDevices",
+                                                "MemoryMap",
+                                                "PathMap",
+                                                "Registers",
+                                                "RegistersExt",
+                                                "RunControl",
+                                                "Simics",
+                                                "SimicsExecTraces",
+                                                "SimicsLogs",
+                                                "Simulation",
+                                                "SimUtils",
+                                                "StackTrace",
+                                                "Streams",
+                                                "Symbols",
+                                                "SymbolsProxyV1",
+                                                "SymbolsProxyV2",
+                                                "TargetIdentification",
+                                                "Trace",
+                                                "ZeroCopy"
+                                            ]
+                                        },
+                                        "type": {
+                                            "type": "array",
+                                            "description": "Message types to silence. \"*\" means all types.",
+                                            "minItems": 1,
+                                            "uniqueItems": true,
+                                            "items": {
+                                                "type": "string",
+                                                "enum": [
+                                                    "*",
+                                                    "command",
+                                                    "event",
+                                                    "flowControl"
+                                                ],
+                                                "enumItemLabels": [
+                                                    "*",
+                                                    "Command",
+                                                    "Event",
+                                                    "Flow Control"
+                                                ],
+                                                "enumDescriptions": [
+                                                    "All message types.",
+                                                    "Commands sent to the agent (C) and their results (R, P and N).",
+                                                    "Events from the agent (E).",
+                                                    "Flow control messages (F). They have no service or name."
+                                                ]
+                                            },
+                                            "default": [
+                                                "*"
+                                            ]
+                                        },
+                                        "name": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "description": "Command or event name, or \"*\" for all. A command's results have its name.",
+                                            "default": "*"
+                                        }
+                                    },
+                                    "default": {
+                                        "service": "",
+                                        "type": [
+                                            "*"
+                                        ],
+                                        "name": "*"
+                                    }
+                                },
+                                "default": [
+                                    {
+                                        "service": "Locator",
+                                        "type": [
+                                            "event"
+                                        ],
+                                        "name": "peerHeartBeat"
+                                    },
+                                    {
+                                        "service": "Locator",
+                                        "type": [
+                                            "event"
+                                        ],
+                                        "name": "peerAdded"
+                                    },
+                                    {
+                                        "service": "Locator",
+                                        "type": [
+                                            "event"
+                                        ],
+                                        "name": "peerRemoved"
+                                    },
+                                    {
+                                        "service": "Locator",
+                                        "type": [
+                                            "event"
+                                        ],
+                                        "name": "peerChanged"
+                                    },
+                                    {
+                                        "service": "CommandLine",
+                                        "type": [
+                                            "*"
+                                        ],
+                                        "name": "*"
+                                    }
+                                ]
+                            },
+                            "disassemblyFunctionHeaders": {
+                                "type": "boolean",
+                                "description": "Show a header row with source file, line and name above the first instruction of each function in the Disassembly view. Needs the agent's Symbols service and the setting debug.disassemblyView.showSourceCode. Turn off to save the symbol lookups.",
+                                "default": true
+                            }
+                        }
+                    }
+                },
+                "initialConfigurations": [
+                    {
+                        "type": "simics-target-debug",
+                        "request": "attach",
+                        "name": "Attach to TCF agent",
+                        "host": "localhost",
+                        "port": 1534
+                    }
+                ],
+                "configurationSnippets": [
+                    {
+                        "label": "Simics Target Debug: Attach to agent",
+                        "description": "Attach to a running TCF agent (for example Simics 'new-tcf-agent').",
+                        "body": {
+                            "type": "simics-target-debug",
+                            "request": "attach",
+                            "name": "Attach to TCF agent",
+                            "host": "localhost",
+                            "port": 1534
+                        }
+                    }
+                ]
+            }
+        ]
+    },
+    "scripts": {
+        "build": "npm run typecheck && npm run compile",
+        "check": "npm run typecheck && npm test",
+        "compile": "node esbuild.mjs",
+        "compile:production": "node esbuild.mjs --production",
+        "watch": "node esbuild.mjs --watch",
+        "typecheck": "tsc --noEmit -p . && tsc --noEmit -p tsconfig.webview.json && tsc --noEmit -p src/launchSettings/webview",
+        "format": "prettier --write .",
+        "test": "node esbuild.mjs --tests && node --enable-source-maps --test \"out/test/*.test.js\"",
+        "vscode:prepublish": "npm run typecheck && npm run compile:production",
+        "package": "vsce package --no-dependencies"
+    },
+    "dependencies": {
+        "@vscode/debugadapter": "^1.68.0",
+        "@vscode/debugprotocol": "^1.68.0",
+        "jsonc-parser": "^3.3.1",
+        "react": "^18.2.0",
+        "react-dom": "^18.2.0"
+    },
+    "devDependencies": {
+        "@types/node": "^22.0.0",
+        "@types/react": "^18.2.43",
+        "@types/react-dom": "^18.2.17",
+        "@types/vscode": "~1.90.0",
+        "@vscode/codicons": "^0.0.45",
+        "@vscode/vsce": "^3.0.0",
+        "esbuild": "^0.25.0",
+        "prettier": "^3.9.10",
+        "typescript": "^5.6.0"
+    }
+}

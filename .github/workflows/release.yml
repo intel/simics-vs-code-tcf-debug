@@ -1,0 +1,138 @@
+name: Release
+run-name: Release (${{ inputs.bump }}${{ inputs.dry_run && ', dry run' || '' }})
+
+on:
+    workflow_dispatch:
+        inputs:
+            bump:
+                description: Version bump level
+                required: true
+                type: choice
+                options:
+                    - patch
+                    - minor
+                    - major
+            dry_run:
+                description: Build and preview without pushing or publishing
+                type: boolean
+                default: false
+
+permissions:
+    contents: read
+
+concurrency:
+    group: release
+    cancel-in-progress: false
+
+jobs:
+    release:
+        runs-on: [self-hosted, gklab, linux, shared]
+        permissions:
+            contents: write
+        steps:
+            - name: Ensure running on main branch
+              run: |
+                  if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+                    echo "::error::Releases must be run from main (currently on '$GITHUB_REF')"
+                    exit 1
+                  fi
+
+            - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+              with:
+                  ref: main
+                  fetch-depth: 0
+
+            - name: Set up path for node/npm
+              run: echo "/usr/itm/node/24.21.0/bin" >> "$GITHUB_PATH"
+
+            - name: Compute new version
+              id: version
+              env:
+                  BUMP: ${{ inputs.bump }}
+              run: |
+                  current=$(node -p "require('./package.json').version")
+                  IFS='.' read -r major minor patch <<< "$current"
+                  case "$BUMP" in
+                    major) major=$((major + 1)); minor=0; patch=0 ;;
+                    minor) minor=$((minor + 1)); patch=0 ;;
+                    patch) patch=$((patch + 1)) ;;
+                    *) echo "::error::Invalid version bump '$BUMP'"; exit 1 ;;
+                  esac
+                  new_version="${major}.${minor}.${patch}"
+                  echo "new_version=$new_version" >> "$GITHUB_OUTPUT"
+                  echo "tag=v$new_version" >> "$GITHUB_OUTPUT"
+                  echo "::notice::Bumping $current to $new_version"
+
+            - name: Check tag does not already exist
+              run: |
+                  if git rev-parse --verify "refs/tags/${{ steps.version.outputs.tag }}" >/dev/null 2>&1; then
+                    echo "::error::Tag '${{ steps.version.outputs.tag }}' already exists"
+                    exit 1
+                  fi
+
+            - name: Update package version and changelog
+              run: |
+                  npm version "${{ steps.version.outputs.new_version }}" --no-git-tag-version
+                  date=$(date +%Y-%m-%d)
+                  sed -i "s/^## \[Unreleased\]$/## [Unreleased]\n\n## [${{ steps.version.outputs.new_version }}] - $date/" CHANGELOG.md
+                  if git diff --quiet package.json; then
+                    echo "::error::package.json version was not updated"
+                    exit 1
+                  fi
+                  grep -q "^## \[${{ steps.version.outputs.new_version }}\] - $date$" CHANGELOG.md
+
+            - name: Commit version bump
+              run: |
+                  git config user.name "github-actions[bot]"
+                  git config user.email "github-actions[bot]@users.noreply.github.com"
+                  git add package.json package-lock.json CHANGELOG.md
+                  git commit -m "Bump ${{ inputs.bump }} for ${{ steps.version.outputs.tag }} release"
+
+            - run: npm ci
+
+            - run: npm run typecheck
+
+            - run: npm test
+
+            - name: Strip Unreleased header for packaging
+              run: sed -i '/^## \[Unreleased\]$/,/^$/{/^## \[Unreleased\]$/d;/^$/d;}' CHANGELOG.md
+
+            - name: Package extension
+              id: package
+              run: npm run package -- --out "simics-target-debug-${{ steps.version.outputs.new_version }}.vsix"
+
+            - name: Build release notes
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  bash ./scripts/build-release-notes.sh "${{ steps.version.outputs.new_version }}" > "$RUNNER_TEMP/release-notes.md"
+                  cat "$RUNNER_TEMP/release-notes.md" >> "$GITHUB_STEP_SUMMARY"
+
+            - name: Push main and tag
+              if: ${{ !inputs.dry_run }}
+              run: |
+                  git tag "${{ steps.version.outputs.tag }}"
+                  git push --atomic origin main "${{ steps.version.outputs.tag }}"
+
+            - name: Create GitHub release
+              if: ${{ !inputs.dry_run }}
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  TAG: ${{ steps.version.outputs.tag }}
+                  VSIX: simics-target-debug-${{ steps.version.outputs.new_version }}.vsix
+              run: |
+                  gh release create "$TAG" \
+                    --verify-tag \
+                    --title "$TAG" \
+                    --notes-file "$RUNNER_TEMP/release-notes.md" \
+                    "$VSIX"
+
+            - name: Upload release artifacts
+              if: ${{ !cancelled() && steps.package.outcome == 'success' }}
+              uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+              with:
+                  name: simics-target-debug-${{ steps.version.outputs.new_version }}
+                  path: |
+                      simics-target-debug-${{ steps.version.outputs.new_version }}.vsix
+                      ${{ runner.temp }}/release-notes.md
+                  if-no-files-found: error

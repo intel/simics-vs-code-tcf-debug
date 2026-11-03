@@ -643,8 +643,6 @@ on the agent (for example with `add-pathmap-entry`).
 
 ## Current limitations
 
-- No reverse execution. Disassembly requires the agent's
-  `Disassembly` service.
 - No exception breakpoints.
 - Breakpoints created by other TCF clients (or the Simics CLI) are not shown.
 - Variables and registers are read-only, there is no "Set Value".

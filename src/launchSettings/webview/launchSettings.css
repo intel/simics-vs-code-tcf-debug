@@ -1,0 +1,516 @@
+/* Launch configurations form. Colours come from the VS Code theme, like in the Settings editor. */
+
+@import "@vscode/codicons/dist/codicon.css";
+
+html,
+body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    color: var(--vscode-foreground);
+    background: var(--vscode-editor-background);
+    font-family: var(--vscode-font-family);
+    font-size: var(--vscode-font-size);
+}
+
+#app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+.layout {
+    display: grid;
+    grid-template-columns: minmax(160px, 240px) 1fr;
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: none;
+}
+
+.layout:disabled {
+    opacity: 0.6;
+}
+
+.list {
+    overflow: auto;
+    border-right: 1px solid var(--vscode-panel-border, var(--vscode-widget-border, transparent));
+}
+
+/* Looks like the title of a VS Code view. */
+.list-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 8px 6px 12px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.list ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.list li {
+    display: flex;
+    align-items: center;
+    padding: 3px 4px 3px 12px;
+    cursor: pointer;
+}
+
+.item-text {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+}
+
+.item-name,
+.item-address {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Opacity instead of a color, so it stays readable on the selected item. */
+.item-address {
+    font-size: 0.9em;
+    font-style: italic;
+    opacity: 0.75;
+}
+
+/* Like inline actions in VS Code trees: only on the item under the mouse or with focus. */
+.list li .actions {
+    display: none;
+}
+
+.list li:hover .actions,
+.list li:focus-within .actions {
+    display: flex;
+}
+
+.list li button.icon.toolbar {
+    padding: 2px;
+    color: inherit;
+}
+
+.codicon-debug-start {
+    color: var(--vscode-debugIcon-startForeground);
+}
+
+.list li:hover {
+    background: var(--vscode-list-hoverBackground);
+}
+
+.list li.selected {
+    color: var(--vscode-list-activeSelectionForeground);
+    background: var(--vscode-list-activeSelectionBackground);
+}
+
+.list li:focus {
+    outline: 1px solid var(--vscode-focusBorder);
+    outline-offset: -1px;
+}
+
+.position {
+    opacity: 0.7;
+}
+
+.details {
+    overflow: auto;
+    padding: 0 24px 24px;
+}
+
+.details-header {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 10px 14px 0;
+}
+
+.actions {
+    display: flex;
+    gap: 2px;
+}
+
+.setting {
+    max-width: 800px;
+    padding: 10px 14px 12px;
+    border-left: 2px solid transparent;
+}
+
+.setting:hover {
+    background: var(--vscode-settings-rowHoverBackground);
+}
+
+.setting.modified {
+    border-left-color: var(--vscode-settings-modifiedItemIndicator);
+}
+
+.setting-title {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.label {
+    font-weight: 600;
+}
+
+.key {
+    color: var(--vscode-descriptionForeground);
+    font-size: 0.9em;
+}
+
+.description {
+    margin: 4px 0 8px;
+    color: var(--vscode-descriptionForeground);
+}
+
+.input {
+    max-width: 420px;
+}
+
+.input-row {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.input-row input[type="text"] {
+    flex: 1;
+    min-width: 0;
+}
+
+input[type="text"],
+select {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 420px;
+    padding: 4px 6px;
+    color: var(--vscode-settings-textInputForeground, var(--vscode-input-foreground));
+    background: var(--vscode-settings-textInputBackground, var(--vscode-input-background));
+    border: 1px solid var(--vscode-settings-textInputBorder, var(--vscode-input-border, transparent));
+    font: inherit;
+}
+
+select {
+    color: var(--vscode-settings-dropdownForeground, var(--vscode-dropdown-foreground));
+    background: var(--vscode-settings-dropdownBackground, var(--vscode-dropdown-background));
+    border-color: var(--vscode-settings-dropdownBorder, var(--vscode-dropdown-border));
+}
+
+input::placeholder {
+    color: var(--vscode-input-placeholderForeground);
+}
+
+input:focus,
+select:focus,
+button:focus-visible {
+    outline: 1px solid var(--vscode-focusBorder);
+    outline-offset: -1px;
+}
+
+input.invalid {
+    border-color: var(--vscode-inputValidation-errorBorder);
+}
+
+.problem input[type="text"] {
+    border-color: var(--vscode-inputValidation-errorBorder);
+}
+
+/* While the user is still editing a table row, its problems wait until focus leaves the row. */
+.object-list tr:focus-within .problem input[type="text"] {
+    border-color: var(--vscode-settings-textInputBorder, var(--vscode-input-border, transparent));
+}
+
+.object-list tr:focus-within .problem-text {
+    display: none;
+}
+
+.validation {
+    margin-top: 4px;
+    color: var(--vscode-errorForeground);
+}
+
+.note {
+    margin-top: 4px;
+    color: var(--vscode-editorWarning-foreground);
+}
+
+.checkbox {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    margin-top: 4px;
+    color: var(--vscode-descriptionForeground);
+}
+
+input[type="checkbox"] {
+    margin: 2px 0 0;
+    accent-color: var(--vscode-checkbox-background);
+}
+
+button {
+    padding: 4px 12px;
+    color: var(--vscode-button-foreground);
+    background: var(--vscode-button-background);
+    border: 1px solid var(--vscode-button-border, transparent);
+    font: inherit;
+    cursor: pointer;
+}
+
+button:hover {
+    background: var(--vscode-button-hoverBackground);
+}
+
+button.secondary {
+    color: var(--vscode-button-secondaryForeground);
+    background: var(--vscode-button-secondaryBackground);
+}
+
+button.secondary:hover {
+    background: var(--vscode-button-secondaryHoverBackground);
+}
+
+button.link,
+button.icon {
+    padding: 0 4px;
+    color: var(--vscode-textLink-foreground);
+    background: none;
+    border: none;
+}
+
+button.icon {
+    color: var(--vscode-icon-foreground, var(--vscode-foreground));
+}
+
+button.link:hover {
+    color: var(--vscode-textLink-activeForeground);
+    text-decoration: underline;
+}
+
+button.icon:hover {
+    background: var(--vscode-toolbar-hoverBackground);
+}
+
+button.icon.toolbar {
+    display: inline-flex;
+    padding: 3px;
+    border-radius: 5px;
+}
+
+button.icon:disabled {
+    opacity: 0.4;
+    background: none;
+}
+
+button:disabled {
+    cursor: default;
+}
+
+.object-list table {
+    width: 100%;
+    max-width: 760px;
+    margin-bottom: 6px;
+    border-collapse: collapse;
+}
+
+.object-list th {
+    padding: 2px 6px 4px 0;
+    color: var(--vscode-descriptionForeground);
+    font-weight: normal;
+    text-align: left;
+}
+
+.object-list td {
+    padding: 2px 6px 2px 0;
+    vertical-align: top;
+}
+
+.object-list td:last-child,
+.object-list th:last-child {
+    width: 1%;
+}
+
+/* The first property is usually a path, give it the most room. */
+.object-list td:first-child,
+.object-list th:first-child {
+    width: 45%;
+}
+
+.object-list .input,
+.object-list input[type="text"] {
+    max-width: none;
+}
+
+.multi-select {
+    position: relative;
+    max-width: 420px;
+}
+
+.combo {
+    position: relative;
+}
+
+.combo-list {
+    position: absolute;
+    z-index: 10;
+    left: 0;
+    min-width: 100%;
+    max-height: 240px;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 2px 0;
+    overflow-y: auto;
+    list-style: none;
+    background: var(--vscode-settings-dropdownBackground, var(--vscode-dropdown-background));
+    border: 1px solid var(--vscode-focusBorder);
+}
+
+.combo-option {
+    padding: 2px 6px;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.combo-option:hover {
+    background: var(--vscode-list-hoverBackground);
+}
+
+.combo-option.active {
+    color: var(--vscode-list-activeSelectionForeground);
+    background: var(--vscode-list-activeSelectionBackground);
+}
+
+.multi-select summary {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 6px;
+    color: var(--vscode-settings-dropdownForeground, var(--vscode-dropdown-foreground));
+    background: var(--vscode-settings-dropdownBackground, var(--vscode-dropdown-background));
+    border: 1px solid var(--vscode-settings-dropdownBorder, var(--vscode-dropdown-border));
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+}
+
+.multi-select summary::-webkit-details-marker {
+    display: none;
+}
+
+.multi-select summary:focus-visible {
+    outline: 1px solid var(--vscode-focusBorder);
+    outline-offset: -1px;
+}
+
+.multi-select summary.default .multi-select-text {
+    color: var(--vscode-input-placeholderForeground);
+}
+
+.multi-select-text {
+    /* Zero basis and width, so the text does not widen its table column. */
+    flex: 1 1 0;
+    width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.object-list td:has(> .multi-select) {
+    width: 25%;
+}
+
+.multi-select-options {
+    position: absolute;
+    z-index: 10;
+    left: 0;
+    min-width: 100%;
+    width: max-content;
+    box-sizing: border-box;
+    padding: 2px 0;
+    background: var(--vscode-settings-dropdownBackground, var(--vscode-dropdown-background));
+    border: 1px solid var(--vscode-focusBorder);
+}
+
+.multi-select-option {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 6px;
+    cursor: pointer;
+}
+
+.multi-select-option:hover {
+    background: var(--vscode-list-hoverBackground);
+}
+
+.multi-select-option input[type="checkbox"] {
+    margin: 0;
+}
+
+.fold-down {
+    max-width: 800px;
+    margin-top: 16px;
+    border-top: 1px solid var(--vscode-panel-border, var(--vscode-widget-border, transparent));
+}
+
+.fold-down > summary {
+    padding: 10px 14px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.fold-down > summary:focus-visible {
+    outline: 1px solid var(--vscode-focusBorder);
+    outline-offset: -1px;
+}
+
+.unsupported {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+
+code {
+    padding: 2px 4px;
+    font-family: var(--vscode-editor-font-family);
+    background: var(--vscode-textCodeBlock-background);
+    word-break: break-all;
+}
+
+.other {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.empty {
+    padding: 0 12px;
+    color: var(--vscode-descriptionForeground);
+    font-style: italic;
+}
+
+.banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 12px;
+    padding: 8px 12px;
+    background: var(--vscode-inputValidation-errorBackground);
+    border: 1px solid var(--vscode-inputValidation-errorBorder);
+}

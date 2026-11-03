@@ -1,0 +1,10 @@
+**
+!out/extension.js
+!out/target-memory.js
+!out/target-memory.css
+!out/webview/launchSettings.js
+!out/webview/launchSettings.css
+!package.json
+!README.md
+!CHANGELOG.md
+!LICENSE.md

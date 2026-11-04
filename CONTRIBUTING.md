@@ -53,5 +53,22 @@ Then you just add a line to every git commit message saying:
 
 Using your known identity (sorry, no anonymous contributions.)
 
-If you set your `user.name` and `user.email` git configs, you can sign your
-commit automatically with `git commit -s`.
+#### Automatically add your sign-off
+
+Make sure your Git `user.name` and `user.email` are configured. To automatically
+add your sign-off in this clone, create `.git/hooks/commit-msg` with:
+
+```sh
+#!/bin/sh
+set -eu
+identity=$(git var GIT_COMMITTER_IDENT | sed 's/>.*/>/')
+git interpret-trailers --in-place \
+    --if-exists addIfDifferent --if-missing add \
+    --trailer "Signed-off-by: $identity" "$1"
+```
+
+Then make it executable:
+
+```sh
+chmod +x .git/hooks/commit-msg
+```

@@ -237,7 +237,7 @@ export class TcfChannel extends EventEmitter {
                 // We provide no services ourselves.
                 this.sendRaw(["E", "Locator", "Hello", "[]"]);
             });
-            socket.on("data", (data) => this.reader.push(data));
+            socket.on("data", (data) => this.reader.push(data as Buffer));
             socket.on("error", (err) => {
                 settle(new Error(`Failed to communicate with TCF agent at ${host}:${port}: ${err.message}`));
                 this.handleClose(err);

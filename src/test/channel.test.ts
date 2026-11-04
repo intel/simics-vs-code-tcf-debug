@@ -273,7 +273,7 @@ test("TcfChannel trace gives the type, service and name of each message", async 
             endOfStream: () => socket.end(),
             error: () => undefined,
         });
-        socket.on("data", (data) => r.push(data));
+        socket.on("data", (data) => r.push(data as Buffer));
         socket.write(encodeMessage(["E", "Locator", "Hello", '["CommandLine"]']));
     });
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));

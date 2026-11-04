@@ -60,8 +60,8 @@ export function App() {
     const gridRef = React.useRef<GridHandle>(null);
     const mainRef = React.useRef<HTMLDivElement>(null);
     const measureRef = React.useRef<HTMLSpanElement>(null);
-    const topAddress = React.useRef<bigint>();
-    const activeFind = React.useRef<ActiveFind>();
+    const topAddress = React.useRef<bigint>(undefined);
+    const activeFind = React.useRef<ActiveFind>(undefined);
     const lastFindId = React.useRef(0);
 
     const addressSize = state?.addressSize ?? 8;
@@ -404,7 +404,7 @@ export function App() {
         return () => observer.disconnect();
     }, []);
 
-    const positionTimer = React.useRef<number>();
+    const positionTimer = React.useRef<number>(undefined);
     const onTopAddress = React.useCallback((address: bigint) => {
         topAddress.current = address;
         window.clearTimeout(positionTimer.current);

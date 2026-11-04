@@ -72,3 +72,7 @@ Then make it executable:
 ```sh
 chmod +x .git/hooks/commit-msg
 ```
+
+### Contribution test coverage
+
+When contributing to this project, please add to or adapt the test coverage.

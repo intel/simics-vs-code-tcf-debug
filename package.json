@@ -356,12 +356,12 @@
             "editor/title": [
                 {
                     "command": "simics-target-debug.openLaunchSettings",
-                    "when": "resourcePath =~ /[\\\\/]\\.vscode[\\\\/]launch\\.json$/ && activeCustomEditorId != simics-target-debug.launchSettings",
+                    "when": "resourcePath =~ /[\\\\/]\\.vscode[\\\\/]launch\\.json$/ && activeCustomEditorId != 'simics-target-debug.launchSettings'",
                     "group": "navigation"
                 },
                 {
                     "command": "simics-target-debug.openLaunchJson",
-                    "when": "activeCustomEditorId == simics-target-debug.launchSettings",
+                    "when": "activeCustomEditorId == 'simics-target-debug.launchSettings'",
                     "group": "navigation"
                 },
                 {
@@ -410,104 +410,104 @@
                 },
                 {
                     "command": "simics-target-debug.openConsole",
-                    "when": "view == simics-target-debug.consoles && debugType == simics-target-debug && !simics-target-debug.hasConsoles",
+                    "when": "view == 'simics-target-debug.consoles' && debugType == 'simics-target-debug' && !simics-target-debug.hasConsoles",
                     "group": "navigation@1"
                 },
                 {
                     "command": "simics-target-debug.saveSymbolFiles",
-                    "when": "view == simics-target-debug.symbolFiles",
+                    "when": "view == 'simics-target-debug.symbolFiles'",
                     "group": "navigation@2"
                 },
                 {
                     "command": "simics-target-debug.addPathMapRule",
-                    "when": "view == simics-target-debug.pathMap",
+                    "when": "view == 'simics-target-debug.pathMap'",
                     "group": "navigation@1"
                 },
                 {
                     "command": "simics-target-debug.savePathMap",
-                    "when": "view == simics-target-debug.pathMap",
+                    "when": "view == 'simics-target-debug.pathMap'",
                     "group": "navigation@2"
                 },
                 {
                     "command": "simics-target-debug.refreshPathMap",
-                    "when": "view == simics-target-debug.pathMap",
+                    "when": "view == 'simics-target-debug.pathMap'",
                     "group": "navigation@3"
                 },
                 {
                     "command": "simics-target-debug.addSymbolFile",
-                    "when": "view == simics-target-debug.symbolFiles",
+                    "when": "view == 'simics-target-debug.symbolFiles'",
                     "group": "navigation@1"
                 },
                 {
                     "command": "simics-target-debug.reloadSymbolFiles",
-                    "when": "view == simics-target-debug.symbolFiles",
+                    "when": "view == 'simics-target-debug.symbolFiles'",
                     "group": "navigation@3"
                 }
             ],
             "view/item/context": [
                 {
                     "command": "simics-target-debug.addSymbolFileBreakpoint",
-                    "when": "view == simics-target-debug.symbolFiles && viewItem =~ /\\bsymbolFile\\b/ && viewItem =~ /\\bscoped\\b/",
+                    "when": "view == 'simics-target-debug.symbolFiles' && viewItem =~ /\\bsymbolFile\\b/ && viewItem =~ /\\bscoped\\b/",
                     "group": "breakpoints@1"
                 },
                 {
                     "command": "simics-target-debug.connectConsole",
-                    "when": "view == simics-target-debug.consoles && viewItem =~ /\\bconnect\\b/",
+                    "when": "view == 'simics-target-debug.consoles' && viewItem =~ /\\bconnect\\b/",
                     "group": "inline@0"
                 },
                 {
                     "command": "simics-target-debug.reconnectConsole",
-                    "when": "view == simics-target-debug.consoles && viewItem =~ /\\breconnect\\b/",
+                    "when": "view == 'simics-target-debug.consoles' && viewItem =~ /\\breconnect\\b/",
                     "group": "inline@0"
                 },
                 {
                     "command": "simics-target-debug.consoleKeysToVsCode",
-                    "when": "view == simics-target-debug.consoles && viewItem =~ /\\bkeysToSimics\\b/",
+                    "when": "view == 'simics-target-debug.consoles' && viewItem =~ /\\bkeysToSimics\\b/",
                     "group": "inline@0"
                 },
                 {
                     "command": "simics-target-debug.consoleKeysToSimics",
-                    "when": "view == simics-target-debug.consoles && viewItem =~ /\\bkeysToVsCode\\b/",
+                    "when": "view == 'simics-target-debug.consoles' && viewItem =~ /\\bkeysToVsCode\\b/",
                     "group": "inline@0"
                 },
                 {
                     "command": "simics-target-debug.clearConsoleHistory",
-                    "when": "view == simics-target-debug.consoles && viewItem =~ /^simicsCli/",
+                    "when": "view == 'simics-target-debug.consoles' && viewItem =~ /^simicsCli/",
                     "group": "inline@1"
                 },
                 {
                     "command": "simics-target-debug.editPathMapRule",
-                    "when": "view == simics-target-debug.pathMap && viewItem == pathMapRule",
+                    "when": "view == 'simics-target-debug.pathMap' && viewItem == 'pathMapRule'",
                     "group": "inline@1"
                 },
                 {
                     "command": "simics-target-debug.removePathMapRule",
-                    "when": "view == simics-target-debug.pathMap && viewItem == pathMapRule",
+                    "when": "view == 'simics-target-debug.pathMap' && viewItem == 'pathMapRule'",
                     "group": "inline@2"
                 },
                 {
                     "command": "simics-target-debug.movePathMapRuleUp",
-                    "when": "view == simics-target-debug.pathMap && viewItem == pathMapRule",
+                    "when": "view == 'simics-target-debug.pathMap' && viewItem == 'pathMapRule'",
                     "group": "order@1"
                 },
                 {
                     "command": "simics-target-debug.movePathMapRuleDown",
-                    "when": "view == simics-target-debug.pathMap && viewItem == pathMapRule",
+                    "when": "view == 'simics-target-debug.pathMap' && viewItem == 'pathMapRule'",
                     "group": "order@2"
                 },
                 {
                     "command": "simics-target-debug.editSymbolFile",
-                    "when": "view == simics-target-debug.symbolFiles && viewItem =~ /\\bsymbolFile\\b/",
+                    "when": "view == 'simics-target-debug.symbolFiles' && viewItem =~ /\\bsymbolFile\\b/",
                     "group": "inline@1"
                 },
                 {
                     "command": "simics-target-debug.reloadSymbolFile",
-                    "when": "view == simics-target-debug.symbolFiles && viewItem =~ /\\bsymbolFile\\b/",
+                    "when": "view == 'simics-target-debug.symbolFiles' && viewItem =~ /\\bsymbolFile\\b/",
                     "group": "inline@2"
                 },
                 {
                     "command": "simics-target-debug.removeSymbolFile",
-                    "when": "view == simics-target-debug.symbolFiles && viewItem =~ /\\bsymbolFile\\b/",
+                    "when": "view == 'simics-target-debug.symbolFiles' && viewItem =~ /\\bsymbolFile\\b/",
                     "group": "inline@3"
                 }
             ],

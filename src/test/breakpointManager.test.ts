@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { BreakpointHost, BreakpointManager, parseHitCondition } from "../breakpointManager";
 import { instructionReference } from "../disassembly";
+import { formatFunctionBreakpointName, parseFunctionBreakpointName } from "../functionBreakpoint";
 import { PathMapper } from "../pathMapper";
 import {
     BreakpointCapabilities,
@@ -73,6 +74,16 @@ function fakeHost(threads: string[]): BreakpointHost & { events: unknown[] } {
 }
 
 test("function breakpoint names preserve explicit context scopes", async () => {
+    assert.deepEqual(parseFunctionBreakpointName(formatFunctionBreakpointName("start_kernel", "cpu0")), {
+        location: "start_kernel",
+        contextId: "cpu0",
+        hasContextDelimiter: true,
+    });
+    assert.deepEqual(parseFunctionBreakpointName(formatFunctionBreakpointName("start_kernel")), {
+        location: "start_kernel",
+        contextId: undefined,
+        hasContextDelimiter: false,
+    });
     const agent = fakeAgent();
     const manager = new BreakpointManager(agent.service, fakeHost(["thread1"]));
     await manager.setFunctionBreakpoints([

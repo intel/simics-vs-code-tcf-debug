@@ -35,6 +35,29 @@ export interface SymbolFile {
     absolute?: true;
 }
 
+export function symbolFileBreakpointContext(
+    file: Pick<SymbolFileConfig, "context">,
+    contexts: readonly { id: string; name: string }[],
+): string {
+    const scope = file.context;
+    if (!scope) {
+        throw new Error("The symbol file has no context");
+    }
+    const exact = contexts.find((context) => context.id === scope);
+    if (exact) {
+        return exact.id;
+    }
+    const matches = contexts.filter((context) => context.name === scope);
+    if (matches.length !== 1) {
+        throw new Error(
+            matches.length === 0
+                ? `Symbol file context '${scope}' is not available in this session`
+                : `Symbol file context '${scope}' is ambiguous; use its exact TCF context ID`,
+        );
+    }
+    return matches[0].id;
+}
+
 /**
  * Validates the "symbolFiles" attribute of a debug configuration. Returns the
  * valid entries and a message for each invalid one.

@@ -479,7 +479,15 @@ export class TcfDebugSession extends DebugSession {
         if (command === "getSymbolContexts" || command === "getFunctionBreakpointContexts") {
             await this.handle(response, async () => {
                 let ids: string[];
-                if (this.channel?.hasService("ContextQuery")) {
+                const includeContainers =
+                    command === "getFunctionBreakpointContexts" &&
+                    typeof args === "object" &&
+                    args !== null &&
+                    "includeContainers" in args &&
+                    args.includeContainers === true;
+                if (includeContainers) {
+                    ids = this.contextOrder;
+                } else if (this.channel?.hasService("ContextQuery")) {
                     const [result] = await this.channel.command("ContextQuery", "query", "HasState=true");
                     if (!Array.isArray(result) || !result.every((id) => typeof id === "string")) {
                         throw new Error("Invalid ContextQuery.query response");
@@ -488,11 +496,15 @@ export class TcfDebugSession extends DebugSession {
                 } else {
                     ids = this.contextOrder.filter((id) => this.contexts.get(id)?.HasState === true);
                 }
-                response.body = ids.map((id) => ({
-                    id,
-                    name: this.contextDisplayName(id),
-                    ...(command === "getFunctionBreakpointContexts" && { threadId: this.threadIdByCtx.get(id) }),
-                }));
+                response.body = ids.map((id) => {
+                    const threadId =
+                        command === "getFunctionBreakpointContexts" ? this.threadIdByCtx.get(id) : undefined;
+                    return {
+                        id,
+                        name: this.contextDisplayName(id),
+                        ...(threadId !== undefined && { threadId }),
+                    };
+                });
             });
             return;
         }

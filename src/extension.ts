@@ -10,7 +10,12 @@ import { setNamedConfigurationValue } from "./launchSettings/launchJson";
 import { MissingSource, SourceLocator } from "./locateSource";
 import { pathMapProblems } from "./pathMapper";
 import { registerPathMapView } from "./pathMapView";
-import { ForeignSymbolFile, SymbolFileConfig, describeForeignSymbolFile } from "./symbolFiles";
+import {
+    ForeignSymbolFile,
+    SymbolFileConfig,
+    describeForeignSymbolFile,
+    symbolFileBreakpointContext,
+} from "./symbolFiles";
 import { suggestSymbolPaths } from "./symbolPath";
 import { registerConsolesView } from "./consolesView";
 import { CONSOLE_AVAILABLE_EVENT, simicsCliOptions } from "./simicsConsole";
@@ -90,6 +95,10 @@ export function activate(context: vscode.ExtensionContext): void {
             "simics-target-debug.addFunctionBreakpointInContext",
             (_source: unknown, frameContext: unknown) => addFunctionBreakpointInContext(sessions, frameContext),
         ),
+        vscode.commands.registerCommand(
+            "simics-target-debug.addSymbolFileBreakpoint",
+            (item?: SymbolFileViewItem) => item && addFunctionBreakpointInContext(sessions, undefined, item),
+        ),
         vscode.commands.registerCommand("simics-target-debug.editSymbolFile", (item?: SymbolFileViewItem) =>
             editSymbolFile(item),
         ),
@@ -157,17 +166,25 @@ function sessionLog(channel: vscode.LogOutputChannel, session: string): TcfLog {
 async function addFunctionBreakpointInContext(
     sessions: Map<string, vscode.DebugSession>,
     frameContext: unknown,
+    symbolFile?: SymbolFileViewItem,
 ): Promise<void> {
     const frame = parseCallStackContext(frameContext);
     const active = vscode.debug.activeStackItem;
-    const session = frame ? sessions.get(frame.sessionId) : (active?.session ?? vscode.debug.activeDebugSession);
+    const session =
+        symbolFile?.session ??
+        (frame ? sessions.get(frame.sessionId) : (active?.session ?? vscode.debug.activeDebugSession));
     if (session?.type !== DEBUG_TYPE) {
-        void vscode.window.showErrorMessage("Select an active Simics Target Debug session.");
+        void vscode.window.showErrorMessage(
+            "Start or select an active Simics Target Debug session before adding a function breakpoint.",
+        );
         return;
     }
     const threadId = frame?.threadId ?? (active?.session.id === session.id ? active.threadId : undefined);
     try {
-        const contexts = (await session.customRequest("getFunctionBreakpointContexts")) as {
+        const contexts = (await session.customRequest(
+            "getFunctionBreakpointContexts",
+            symbolFile ? { includeContainers: true } : undefined,
+        )) as {
             id: string;
             name: string;
             threadId?: number;
@@ -189,12 +206,14 @@ async function addFunctionBreakpointInContext(
                 .filter((context) => context !== selected)
                 .map((context) => ({ label: context.name, description: context.id, id: context.id })),
         ];
-        const context = await vscode.window.showQuickPick(choices, {
-            title: "Function Breakpoint Context",
-            placeHolder: "Choose a core or all contexts",
-            matchOnDescription: true,
-            matchOnDetail: true,
-        });
+        const context = symbolFile
+            ? { id: symbolFileBreakpointContext(symbolFile.file, contexts) }
+            : await vscode.window.showQuickPick(choices, {
+                  title: "Function Breakpoint Context",
+                  placeHolder: "Choose a core or all contexts",
+                  matchOnDescription: true,
+                  matchOnDetail: true,
+              });
         if (!context) {
             return;
         }
@@ -669,7 +688,7 @@ async function changeSymbolFiles(command: string, item?: SymbolFileViewItem): Pr
 }
 
 class SymbolFileViewItem extends vscode.TreeItem {
-    override readonly contextValue = "symbolFile";
+    override readonly contextValue: string;
 
     constructor(
         readonly file: SymbolFileConfig,
@@ -677,6 +696,7 @@ class SymbolFileViewItem extends vscode.TreeItem {
         readonly session: vscode.DebugSession,
     ) {
         super(path.basename(file.path));
+        this.contextValue = file.context ? "symbolFile scoped" : "symbolFile";
         const scope =
             [file.context && `context ${file.context}`, file.contextQuery && `query ${file.contextQuery}`]
                 .filter(Boolean)

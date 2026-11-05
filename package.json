@@ -22,6 +22,12 @@
     "contributes": {
         "commands": [
             {
+                "command": "simics-target-debug.addSymbolFileBreakpoint",
+                "title": "Add Function Breakpoint...",
+                "category": "Simics Target Debug",
+                "icon": "$(debug-breakpoint-function)"
+            },
+            {
                 "command": "simics-target-debug.addFunctionBreakpointInContext",
                 "title": "Add Function Breakpoint in Context...",
                 "category": "Simics Target Debug",
@@ -218,19 +224,19 @@
                     "id": "simics-target-debug.pathMap",
                     "name": "Path Maps",
                     "icon": "$(replace-all)",
-                    "when": "debugType == simics-target-debug"
+                    "when": "debugType == 'simics-target-debug'"
                 },
                 {
                     "id": "simics-target-debug.symbolFiles",
                     "name": "Symbol Files",
                     "icon": "$(file-code)",
-                    "when": "debugType == simics-target-debug"
+                    "when": "debugType == 'simics-target-debug'"
                 },
                 {
                     "id": "simics-target-debug.consoles",
                     "name": "Consoles",
                     "icon": "$(terminal)",
-                    "when": "debugType == simics-target-debug || simics-target-debug.hasConsoles"
+                    "when": "debugType == 'simics-target-debug' || simics-target-debug.hasConsoles"
                 }
             ]
         },
@@ -243,24 +249,28 @@
         "menus": {
             "commandPalette": [
                 {
+                    "command": "simics-target-debug.addSymbolFileBreakpoint",
+                    "when": "false"
+                },
+                {
                     "command": "simics-target-debug.addFunctionBreakpointInContext",
-                    "when": "debugType == simics-target-debug"
+                    "when": "debugType == 'simics-target-debug'"
                 },
                 {
                     "command": "simics-target-debug.saveSymbolFiles",
-                    "when": "debugType == simics-target-debug"
+                    "when": "debugType == 'simics-target-debug'"
                 },
                 {
                     "command": "simics-target-debug.addPathMapRule",
-                    "when": "debugType == simics-target-debug"
+                    "when": "debugType == 'simics-target-debug'"
                 },
                 {
                     "command": "simics-target-debug.savePathMap",
-                    "when": "debugType == simics-target-debug"
+                    "when": "debugType == 'simics-target-debug'"
                 },
                 {
                     "command": "simics-target-debug.refreshPathMap",
-                    "when": "debugType == simics-target-debug"
+                    "when": "debugType == 'simics-target-debug'"
                 },
                 {
                     "command": "simics-target-debug.editPathMapRule",
@@ -280,11 +290,11 @@
                 },
                 {
                     "command": "simics-target-debug.locateSourceFile",
-                    "when": "debugType == simics-target-debug"
+                    "when": "debugType == 'simics-target-debug'"
                 },
                 {
                     "command": "simics-target-debug.openLaunchJson",
-                    "when": "activeCustomEditorId == simics-target-debug.launchSettings"
+                    "when": "activeCustomEditorId == 'simics-target-debug.launchSettings'"
                 },
                 {
                     "command": "simics-target-debug.copyFrameAddress",
@@ -395,7 +405,7 @@
             "view/title": [
                 {
                     "command": "simics-target-debug.addFunctionBreakpointInContext",
-                    "when": "view == workbench.debug.viewlet.state && debugType == simics-target-debug",
+                    "when": "view == 'workbench.debug.viewlet.state' && debugType == 'simics-target-debug'",
                     "group": "navigation@1"
                 },
                 {
@@ -435,6 +445,11 @@
                 }
             ],
             "view/item/context": [
+                {
+                    "command": "simics-target-debug.addSymbolFileBreakpoint",
+                    "when": "view == simics-target-debug.symbolFiles && viewItem =~ /\\bsymbolFile\\b/ && viewItem =~ /\\bscoped\\b/",
+                    "group": "breakpoints@1"
+                },
                 {
                     "command": "simics-target-debug.connectConsole",
                     "when": "view == simics-target-debug.consoles && viewItem =~ /\\bconnect\\b/",
@@ -482,17 +497,17 @@
                 },
                 {
                     "command": "simics-target-debug.editSymbolFile",
-                    "when": "view == simics-target-debug.symbolFiles && viewItem == symbolFile",
+                    "when": "view == simics-target-debug.symbolFiles && viewItem =~ /\\bsymbolFile\\b/",
                     "group": "inline@1"
                 },
                 {
                     "command": "simics-target-debug.reloadSymbolFile",
-                    "when": "view == simics-target-debug.symbolFiles && viewItem == symbolFile",
+                    "when": "view == simics-target-debug.symbolFiles && viewItem =~ /\\bsymbolFile\\b/",
                     "group": "inline@2"
                 },
                 {
                     "command": "simics-target-debug.removeSymbolFile",
-                    "when": "view == simics-target-debug.symbolFiles && viewItem == symbolFile",
+                    "when": "view == simics-target-debug.symbolFiles && viewItem =~ /\\bsymbolFile\\b/",
                     "group": "inline@3"
                 }
             ],

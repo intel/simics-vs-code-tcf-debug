@@ -202,6 +202,13 @@ Scoped function breakpoints require the agent's `ContextIds` support and are
 never silently planted globally when it is unavailable. Their scope applies
 to that context (and, for a process context, its threads), not other cores.
 
+In **Symbol Files**, right-click a configured symbol file with a context and
+select **Add Function Breakpoint...** to enter a symbol directly. The breakpoint
+uses the file's context rather than the selected call-stack core. Context names
+are resolved to exact TCF IDs; unavailable or ambiguous contexts produce an error
+instead of creating a global breakpoint. Files without a context do not offer
+this action.
+
 An address only has a meaning in one address space, so an instruction
 breakpoint is limited to the process of the context shown in the Disassembly
 view (its `ProcessID`). `ContextIds` lists the process and all its threads:

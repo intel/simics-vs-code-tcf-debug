@@ -76,6 +76,16 @@ export class BreakpointsService {
         await this.channel.command(BreakpointsService.NAME, "change", bp);
     }
 
+    /** Sets only the Enabled property of the breakpoints to true. */
+    async enable(ids: string[]): Promise<void> {
+        await this.channel.command(BreakpointsService.NAME, "enable", ids);
+    }
+
+    /** Sets only the Enabled property of the breakpoints to false. */
+    async disable(ids: string[]): Promise<void> {
+        await this.channel.command(BreakpointsService.NAME, "disable", ids);
+    }
+
     async remove(ids: string[]): Promise<void> {
         await this.channel.command(BreakpointsService.NAME, "remove", ids);
     }

@@ -51,7 +51,17 @@ interface ManagedBreakpoint extends BreakpointSpec {
     reported: boolean;
     /** The last DAP breakpoint sent to VS Code, to avoid sending unchanged ones. */
     lastReported?: string;
+    /** The line last sent to VS Code, which VS Code uses as the breakpoint's line. */
+    reportedLine?: number;
+    /** Disabled in the agent: VS Code left it out of the last request, but still has it. */
+    disabled?: boolean;
 }
+
+/** A breakpoint that VS Code left out of a set*Breakpoints request. */
+export type OmittedBreakpoint =
+    | { kind: "source"; path: string; lines: number[]; column?: number }
+    | { kind: "function"; name: string }
+    | { kind: "data"; address: bigint };
 
 export interface BreakpointHost {
     sendEvent(event: DebugProtocol.Event): void;
@@ -68,6 +78,11 @@ export interface BreakpointHost {
     processContexts(contextId: string): string[];
     /** The context of instruction references without one. */
     defaultContext(): string | undefined;
+    /**
+     * True if VS Code still has an omitted breakpoint, which is then disabled
+     * (or all breakpoints deactivated) rather than deleted.
+     */
+    isDisabled?(bp: OmittedBreakpoint): boolean;
 }
 
 export interface BreakpointHits {
@@ -88,9 +103,9 @@ const ACCESS_TYPES: Record<DebugProtocol.DataBreakpointAccessType, number> = {
 
 /**
  * Keeps the TCF agent's breakpoint table in sync with the breakpoints in VS
- * Code. VS Code always sends the full list of breakpoints of one kind (or one
- * source file), which is diffed against what is planted to send Breakpoints
- * add/change/remove commands.
+ * Code. VS Code always sends the full list of enabled breakpoints of one kind
+ * (or one source file), which is diffed against what is planted to send
+ * Breakpoints add/change/enable/disable/remove commands.
  */
 export class BreakpointManager {
     private readonly idPrefix = `vscode-tcf-${randomUUID()}`;
@@ -441,18 +456,23 @@ export class BreakpointManager {
         const toChange: ManagedBreakpoint[] = [];
         const toRemove: string[] = [];
 
+        const toEnable: ManagedBreakpoint[] = [];
+        const toDisable: ManagedBreakpoint[] = [];
+
         for (const spec of specs) {
             const old = unused.get(spec.key);
             if (old) {
                 unused.delete(spec.key);
                 const propsChanged = JSON.stringify(old.props) !== JSON.stringify(spec.props);
+                const wasDisabled = old.disabled === true;
                 Object.assign(old, spec);
                 old.error = spec.error;
                 old.logMessage = spec.logMessage;
                 old.scopeContext = spec.scopeContext;
-                if (propsChanged) {
+                old.disabled = false;
+                if (propsChanged || wasDisabled) {
                     if (old.tcfId && spec.props) {
-                        toChange.push(old);
+                        (propsChanged ? toChange : toEnable).push(old);
                     } else if (old.tcfId) {
                         toRemove.push(this.forget(old));
                     } else if (spec.props) {
@@ -468,8 +488,21 @@ export class BreakpointManager {
                 result.push(bp);
             }
         }
+        // Kept after the requested ones, which report() returns in request order.
         for (const bp of unused.values()) {
-            if (bp.tcfId) {
+            if (!bp.tcfId) {
+                continue;
+            }
+            const left = omitted(bp);
+            if (left && this.host.isDisabled?.(left)) {
+                if (!bp.disabled) {
+                    bp.disabled = true;
+                    toDisable.push(bp);
+                }
+                // VS Code no longer knows the DAP ID.
+                bp.reported = false;
+                result.push(bp);
+            } else {
                 toRemove.push(this.forget(bp));
             }
         }
@@ -484,8 +517,34 @@ export class BreakpointManager {
         if (toRemove.length > 0) {
             await this.service.remove(toRemove).catch(() => undefined);
         }
-        await Promise.all([...toAdd.map((bp) => this.plant(bp, false)), ...toChange.map((bp) => this.plant(bp, true))]);
+        await Promise.all([
+            this.setEnabled(toDisable, false),
+            this.setEnabled(toEnable, true),
+            ...toAdd.map((bp) => this.plant(bp, false)),
+            ...toChange.map((bp) => this.plant(bp, true)),
+        ]);
         return result;
+    }
+
+    private async setEnabled(bps: ManagedBreakpoint[], enabled: boolean): Promise<void> {
+        if (bps.length === 0) {
+            return;
+        }
+        const service = this.service!;
+        const ids = bps.map((bp) => bp.tcfId!);
+        try {
+            await (enabled ? service.enable(ids) : service.disable(ids));
+        } catch {
+            await Promise.all(bps.map((bp) => this.plant(bp, true)));
+            return;
+        }
+        if (enabled) {
+            await Promise.all(
+                bps.map(async (bp) => {
+                    bp.status = await service.getStatus(bp.tcfId!).catch(() => bp.status);
+                }),
+            );
+        }
     }
 
     private async plant(bp: ManagedBreakpoint, change: boolean): Promise<void> {
@@ -496,11 +555,12 @@ export class BreakpointManager {
         }
         const id = bp.tcfId!;
         bp.status = undefined;
+        const props: BreakpointProperties = { ...bp.props, ID: id, ...(bp.disabled && { Enabled: false }) };
         try {
             if (change) {
-                await service.change({ ...bp.props, ID: id });
+                await service.change(props);
             } else {
-                await service.add({ ...bp.props, ID: id });
+                await service.add(props);
             }
         } catch (err) {
             this.forget(bp);
@@ -524,11 +584,13 @@ export class BreakpointManager {
         return id;
     }
 
-    private async report(bps: ManagedBreakpoint[]): Promise<DebugProtocol.Breakpoint[]> {
+    private async report(all: ManagedBreakpoint[]): Promise<DebugProtocol.Breakpoint[]> {
+        const bps = all.filter((bp) => !bp.disabled);
         const result = await Promise.all(bps.map((bp) => this.toDap(bp)));
         bps.forEach((bp, i) => {
             bp.reported = true;
             bp.lastReported = JSON.stringify(result[i]);
+            bp.reportedLine = result[i].line;
         });
         return result;
     }
@@ -539,6 +601,7 @@ export class BreakpointManager {
         const json = JSON.stringify(dap);
         if (bp.reported && json !== bp.lastReported) {
             bp.lastReported = json;
+            bp.reportedLine = dap.line;
             this.host.sendEvent(new BreakpointEvent("changed", dap));
         }
     }
@@ -631,6 +694,24 @@ export function parseHitCondition(hitCondition: string): number | undefined {
         return undefined;
     }
     return Math.max(Number(m[1]) - 1, 0);
+}
+
+function omitted(bp: ManagedBreakpoint): OmittedBreakpoint | undefined {
+    switch (bp.kind) {
+        case "source": {
+            const lines = [bp.line, bp.reportedLine].filter((l): l is number => l !== undefined);
+            return { kind: "source", path: bp.source?.path ?? bp.source?.name ?? "", lines, column: bp.column };
+        }
+        case "function":
+            return { kind: "function", name: bp.key };
+        case "data": {
+            const target = parseDataId(bp.key.slice(0, bp.key.lastIndexOf("|")));
+            return target && { kind: "data", address: target.address };
+        }
+        default:
+            // VS Code does not show instruction breakpoints to extensions.
+            return undefined;
+    }
 }
 
 function parseDataId(dataId: string): { address: bigint; size: number } | undefined {

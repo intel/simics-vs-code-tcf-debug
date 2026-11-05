@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { BreakpointHost, BreakpointManager, parseHitCondition } from "../breakpointManager";
+import { BreakpointHost, BreakpointManager, OmittedBreakpoint, parseHitCondition } from "../breakpointManager";
 import { instructionReference } from "../disassembly";
 import { PathMapper } from "../pathMapper";
 import {
@@ -50,6 +50,12 @@ function fakeAgent(): FakeAgent {
         remove: async (ids: string[]) => {
             agent.commands.push(["remove", ids]);
         },
+        enable: async (ids: string[]) => {
+            agent.commands.push(["enable", ids]);
+        },
+        disable: async (ids: string[]) => {
+            agent.commands.push(["disable", ids]);
+        },
         getStatus: async (): Promise<BreakpointStatus> => ({
             Instances: [{ LocationContext: "thread1", Address: 0x1010 }],
         }),
@@ -71,6 +77,88 @@ function fakeHost(threads: string[]): BreakpointHost & { events: unknown[] } {
         defaultContext: () => "thread1",
     };
 }
+
+// VS Code leaves disabled breakpoints out of setBreakpoints, like deleted
+// ones; only the host can tell them apart.
+test("breakpoints that VS Code still has are disabled, not removed", async () => {
+    const agent = fakeAgent();
+    const host = fakeHost(["thread1"]);
+    let kept = true;
+    const asked: OmittedBreakpoint[] = [];
+    host.isDisabled = (bp) => {
+        asked.push(bp);
+        return kept;
+    };
+    const manager = new BreakpointManager(agent.service, host);
+    const source = { path: "/host/main.c" };
+    const [before] = await manager.setSourceBreakpoints(source, [{ line: 12 }]);
+    const id = (agent.commands[0][1] as BreakpointProperties).ID;
+
+    assert.deepEqual(await manager.setSourceBreakpoints(source, []), []);
+    assert.deepEqual(agent.commands[1], ["disable", [id]]);
+    assert.deepEqual(asked, [{ kind: "source", path: "/host/main.c", lines: [12, 12], column: undefined }]);
+
+    const [after] = await manager.setSourceBreakpoints(source, [{ line: 12 }]);
+    assert.deepEqual(agent.commands[2], ["enable", [id]]);
+    assert.equal(after.id, before.id);
+    assert.equal(after.verified, true);
+
+    await manager.setSourceBreakpoints(source, []);
+    kept = false;
+    await manager.setSourceBreakpoints(source, []);
+    assert.deepEqual(agent.commands.slice(3), [
+        ["disable", [id]],
+        ["remove", [id]],
+    ]);
+});
+
+test("a disabled breakpoint stays disabled when it is changed", async () => {
+    const agent = fakeAgent();
+    const host = fakeHost(["thread1"]);
+    let prefix = "/old";
+    host.toTargetPath = async () => `${prefix}/main.c`;
+    host.isDisabled = () => true;
+    const manager = new BreakpointManager(agent.service, host);
+    const source = { path: "/host/main.c" };
+    await manager.setSourceBreakpoints(source, [{ line: 12 }]);
+    await manager.setSourceBreakpoints(source, []);
+    prefix = "/new";
+    await manager.updateSourcePaths();
+    const [command, props] = agent.commands[2] as [string, BreakpointProperties];
+    assert.equal(command, "change");
+    assert.equal(props.File, "/new/main.c");
+    assert.equal(props.Enabled, false);
+    assert.equal(host.events.length, 0);
+
+    await manager.setSourceBreakpoints(source, [{ line: 12, condition: "x" }]);
+    const [again, enabled] = agent.commands[3] as [string, BreakpointProperties];
+    assert.equal(again, "change");
+    assert.equal(enabled.Enabled, true);
+    assert.equal(enabled.Condition, "x");
+});
+
+test("function and data breakpoints are disabled too", async () => {
+    const agent = fakeAgent();
+    const host = fakeHost(["thread1"]);
+    const asked: OmittedBreakpoint[] = [];
+    host.isDisabled = (bp) => {
+        asked.push(bp);
+        return true;
+    };
+    const manager = new BreakpointManager(agent.service, host);
+    await manager.setFunctionBreakpoints([{ name: "main" }]);
+    await manager.setFunctionBreakpoints([]);
+    await manager.setDataBreakpoints([{ dataId: "0x1000:4", accessType: "write" }]);
+    await manager.setDataBreakpoints([]);
+    assert.deepEqual(asked, [
+        { kind: "function", name: "main" },
+        { kind: "data", address: 0x1000n },
+    ]);
+    assert.deepEqual(
+        agent.commands.map(([c]) => c),
+        ["add", "disable", "add", "disable"],
+    );
+});
 
 test("path map edits remap planted source breakpoints without changing IDs", async () => {
     const agent = fakeAgent();

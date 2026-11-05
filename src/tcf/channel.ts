@@ -24,6 +24,7 @@ export class TcfError extends Error {
         message: string,
         readonly code?: number,
         readonly data?: unknown,
+        /** Set when the agent replied N: it does not know the service or command. */
         readonly unsupported = false,
     ) {
         super(message);
@@ -52,6 +53,7 @@ interface PendingCommand {
 }
 
 export type EventListener = (args: unknown[]) => void;
+export type AnyEventListener = (service: string, event: string, args: unknown[]) => void;
 
 /** Formats a TCF error report object (or legacy error value) into a message. */
 export function formatTcfError(err: unknown): string {
@@ -180,6 +182,7 @@ export class TcfChannel extends EventEmitter {
     private nextToken = 1;
     private readonly pending = new Map<string, PendingCommand>();
     private readonly eventListeners = new Map<string, Set<EventListener>>();
+    private readonly anyEventListeners = new Set<AnyEventListener>();
     private peerServices: string[] = [];
     private closed = false;
 
@@ -300,6 +303,12 @@ export class TcfChannel extends EventEmitter {
         return () => set.delete(listener);
     }
 
+    /** Listens to every event, after the listeners of that event. Returns a function that removes the listener. */
+    onAnyEvent(listener: AnyEventListener): () => void {
+        this.anyEventListeners.add(listener);
+        return () => this.anyEventListeners.delete(listener);
+    }
+
     private sendRaw(fields: string[]): void {
         if (!this.socket || this.closed) {
             return;
@@ -339,14 +348,22 @@ export class TcfChannel extends EventEmitter {
             }
             case "E": {
                 const listeners = this.eventListeners.get(`${fields[1]}\0${fields[2]}`);
-                if (listeners) {
-                    const args = fields.slice(3).map(parseField);
-                    for (const l of listeners) {
-                        try {
-                            l(args);
-                        } catch (err) {
-                            this.emitError(err instanceof Error ? err : new Error(String(err)));
-                        }
+                if (!listeners?.size && this.anyEventListeners.size === 0) {
+                    break;
+                }
+                const args = fields.slice(3).map(parseField);
+                for (const l of listeners ?? []) {
+                    try {
+                        l(args);
+                    } catch (err) {
+                        this.emitError(err instanceof Error ? err : new Error(String(err)));
+                    }
+                }
+                for (const l of this.anyEventListeners) {
+                    try {
+                        l(fields[1], fields[2], args);
+                    } catch (err) {
+                        this.emitError(err instanceof Error ? err : new Error(String(err)));
                     }
                 }
                 break;

@@ -2,6 +2,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
 import { DebugProtocol } from "@vscode/debugprotocol";
+import { OmittedBreakpoint } from "./breakpointManager";
 import { parseCallStackContext } from "./callStackFrame";
 import { parseInstructionReference } from "./disassembly";
 import { registerFunctionHeaderFileSystem } from "./functionHeaderFileSystem";
@@ -51,7 +52,7 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.debug.registerDebugConfigurationProvider(DEBUG_TYPE, new TcfConfigurationProvider()),
         vscode.debug.registerDebugAdapterDescriptorFactory(DEBUG_TYPE, {
             createDebugAdapterDescriptor: (session) => {
-                const adapter = new TcfDebugSession(sessionLog(tcfLog, session.name));
+                const adapter = new TcfDebugSession(sessionLog(tcfLog, session.name), hasBreakpoint);
                 adapters.set(session.id, adapter);
                 return new vscode.DebugAdapterInlineImplementation(adapter);
             },
@@ -133,6 +134,52 @@ export function activate(context: vscode.ExtensionContext): void {
 
 export function deactivate(): void {
     // Nothing to clean up, sessions are disposed by VS Code.
+}
+
+/**
+ * True if VS Code still has a breakpoint, enabled or not, that it left out of
+ * a set*Breakpoints request. VS Code updates this list before it sends the
+ * request.
+ */
+function hasBreakpoint(omitted: OmittedBreakpoint): boolean {
+    return vscode.debug.breakpoints.some((bp) => {
+        switch (omitted.kind) {
+            case "source": {
+                if (!(bp instanceof vscode.SourceBreakpoint)) {
+                    return false;
+                }
+                const { uri, range } = bp.location;
+                const file = uri.scheme === "file" ? uri.fsPath : uri.toString();
+                const column = range.start.character + 1;
+                return (
+                    path.normalize(file) === path.normalize(omitted.path) &&
+                    omitted.lines.includes(range.start.line + 1) &&
+                    (omitted.column === undefined || column === 1 || column === omitted.column)
+                );
+            }
+            case "function":
+                return bp instanceof vscode.FunctionBreakpoint && bp.functionName === omitted.name;
+            case "data":
+                return dataBreakpointAddress(bp) === omitted.address;
+        }
+    });
+}
+
+/**
+ * The address of a data breakpoint. vscode.DataBreakpoint is newer than the
+ * API version used here; its dataId is ours ("<address>:<size>") or the
+ * address entered in VS Code.
+ */
+function dataBreakpointAddress(bp: vscode.Breakpoint): bigint | undefined {
+    const dataId: unknown = (bp as { dataId?: unknown }).dataId;
+    if (typeof dataId !== "string") {
+        return undefined;
+    }
+    try {
+        return BigInt(dataId.split(":")[0].trim());
+    } catch {
+        return undefined;
+    }
 }
 
 /**

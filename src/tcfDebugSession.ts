@@ -36,7 +36,7 @@ import {
 } from "./disassembly";
 import { FunctionInfo, FunctionRanges } from "./functionHeaders";
 import { MemoryAccessMode, MemoryService } from "./tcf/services/memory";
-import { BreakpointHits, BreakpointManager } from "./breakpointManager";
+import { BreakpointHits, BreakpointManager, OmittedBreakpoint } from "./breakpointManager";
 import { VariableNode, VariablesProvider } from "./variables";
 import { PathMapper, PathMapRule, parsePathMapConfig } from "./pathMapper";
 import { PathMapService } from "./tcf/services/pathMap";
@@ -220,7 +220,11 @@ export class TcfDebugSession extends DebugSession {
     private readonly regContextCache = new Map<string, Promise<RegistersContext>>();
     private readonly regChildrenCache = new Map<string, Promise<string[]>>();
 
-    constructor(private readonly tcfLog?: TcfLog) {
+    constructor(
+        private readonly tcfLog?: TcfLog,
+        /** See BreakpointHost.isDisabled. */
+        private readonly isBreakpointDisabled?: (bp: OmittedBreakpoint) => boolean,
+    ) {
         super();
         this.setDebuggerLinesStartAt1(true);
         this.setDebuggerColumnsStartAt1(true);
@@ -397,6 +401,7 @@ export class TcfDebugSession extends DebugSession {
                     toTargetPath: (hostPath, contextId) => pathMapper.toTargetLocation(hostPath, contextId),
                     processContexts: (ctxId) => this.processContexts(ctxId),
                     defaultContext: () => this.suspendedThreadContext(),
+                    isDisabled: (bp) => this.isBreakpointDisabled?.(bp) ?? false,
                 },
             );
 

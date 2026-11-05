@@ -86,6 +86,10 @@ export function activate(context: vscode.ExtensionContext): void {
             copyFrameAddress(sessions, context),
         ),
         vscode.commands.registerCommand("simics-target-debug.addSymbolFile", () => addSymbolFile(symbolFiles)),
+        vscode.commands.registerCommand(
+            "simics-target-debug.addFunctionBreakpointInContext",
+            (_source: unknown, frameContext: unknown) => addFunctionBreakpointInContext(sessions, frameContext),
+        ),
         vscode.commands.registerCommand("simics-target-debug.editSymbolFile", (item?: SymbolFileViewItem) =>
             editSymbolFile(item),
         ),
@@ -148,6 +152,71 @@ function sessionLog(channel: vscode.LogOutputChannel, session: string): TcfLog {
         info: (line) => channel.info(`[${session}] ${line}`),
         error: (line) => channel.error(`[${session}] ${line}`),
     };
+}
+
+async function addFunctionBreakpointInContext(
+    sessions: Map<string, vscode.DebugSession>,
+    frameContext: unknown,
+): Promise<void> {
+    const frame = parseCallStackContext(frameContext);
+    const active = vscode.debug.activeStackItem;
+    const session = frame ? sessions.get(frame.sessionId) : (active?.session ?? vscode.debug.activeDebugSession);
+    if (session?.type !== DEBUG_TYPE) {
+        void vscode.window.showErrorMessage("Select an active Simics Target Debug session.");
+        return;
+    }
+    const threadId = frame?.threadId ?? (active?.session.id === session.id ? active.threadId : undefined);
+    try {
+        const contexts = (await session.customRequest("getFunctionBreakpointContexts")) as {
+            id: string;
+            name: string;
+            threadId?: number;
+        }[];
+        const selected = contexts.find((context) => threadId !== undefined && context.threadId === threadId);
+        const choices: SymbolContextChoice[] = [
+            ...(selected
+                ? [
+                      {
+                          label: selected.name,
+                          description: "Selected call-stack context",
+                          detail: selected.id,
+                          id: selected.id,
+                      },
+                  ]
+                : []),
+            { label: "All contexts", description: "No context filter", id: "" },
+            ...contexts
+                .filter((context) => context !== selected)
+                .map((context) => ({ label: context.name, description: context.id, id: context.id })),
+        ];
+        const context = await vscode.window.showQuickPick(choices, {
+            title: "Function Breakpoint Context",
+            placeHolder: "Choose a core or all contexts",
+            matchOnDescription: true,
+            matchOnDetail: true,
+        });
+        if (!context) {
+            return;
+        }
+        const symbol = await vscode.window.showInputBox({
+            title: "Add Function Breakpoint",
+            prompt: context.id ? `Symbol in ${context.id}` : "Symbol in all contexts",
+            validateInput: (value) => (!value.trim() ? "Enter a symbol or expression" : undefined),
+        });
+        if (!symbol?.trim()) {
+            return;
+        }
+        const name = context.id ? `${symbol.trim()} @ ${context.id}` : symbol.trim();
+        if (
+            !vscode.debug.breakpoints.some((bp) => bp instanceof vscode.FunctionBreakpoint && bp.functionName === name)
+        ) {
+            vscode.debug.addBreakpoints([new vscode.FunctionBreakpoint(name)]);
+        }
+    } catch (err) {
+        void vscode.window.showErrorMessage(
+            `Could not add function breakpoint: ${err instanceof Error ? err.message : String(err)}`,
+        );
+    }
 }
 
 async function addSymbolFile(symbolFiles: SymbolFilesProvider): Promise<void> {

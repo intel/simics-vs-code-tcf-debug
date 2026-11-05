@@ -906,6 +906,7 @@
         "format": "prettier --write .",
         "test": "node esbuild.mjs --tests && node --enable-source-maps --test \"out/test/*.test.js\"",
         "test:fuzz": "node esbuild.mjs --tests && node --enable-source-maps --test out/test/fuzzing.test.js",
+        "compile:tcf-cli": "node esbuild.mjs --tcf-cli && node --enable-source-maps out/tcf-cli.js",
         "vscode:prepublish": "npm run typecheck && npm run compile:production",
         "package": "vsce package --no-dependencies"
     },

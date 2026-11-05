@@ -4,7 +4,7 @@
         "target": "ES2022",
         "lib": ["ES2022"],
         "outDir": "out",
-        "rootDir": "src",
+        "rootDir": ".",
         "strict": true,
         "noImplicitOverride": true,
         "noUnusedLocals": true,
@@ -12,6 +12,6 @@
         "skipLibCheck": true,
         "sourceMap": true
     },
-    "include": ["src"],
+    "include": ["src", "scripts"],
     "exclude": ["src/webview", "src/launchSettings/webview"]
 }

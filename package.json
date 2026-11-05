@@ -22,6 +22,12 @@
     "contributes": {
         "commands": [
             {
+                "command": "simics-target-debug.addFunctionBreakpointInContext",
+                "title": "Add Function Breakpoint in Context...",
+                "category": "Simics Target Debug",
+                "icon": "$(debug-breakpoint-function)"
+            },
+            {
                 "command": "simics-target-debug.addPathMapRule",
                 "title": "Add Path Map Rule...",
                 "category": "Simics Target Debug",
@@ -237,6 +243,10 @@
         "menus": {
             "commandPalette": [
                 {
+                    "command": "simics-target-debug.addFunctionBreakpointInContext",
+                    "when": "debugType == simics-target-debug"
+                },
+                {
                     "command": "simics-target-debug.saveSymbolFiles",
                     "when": "debugType == simics-target-debug"
                 },
@@ -384,6 +394,11 @@
             ],
             "view/title": [
                 {
+                    "command": "simics-target-debug.addFunctionBreakpointInContext",
+                    "when": "view == workbench.debug.viewlet.state && debugType == simics-target-debug",
+                    "group": "navigation@1"
+                },
+                {
                     "command": "simics-target-debug.openConsole",
                     "when": "view == simics-target-debug.consoles && debugType == simics-target-debug && !simics-target-debug.hasConsoles",
                     "group": "navigation@1"
@@ -488,6 +503,11 @@
                 }
             ],
             "debug/callstack/context": [
+                {
+                    "command": "simics-target-debug.addFunctionBreakpointInContext",
+                    "when": "debugType == 'simics-target-debug' && callStackItemType == 'stackFrame'",
+                    "group": "3_modification"
+                },
                 {
                     "command": "simics-target-debug.copyFrameAddress",
                     "when": "debugType == 'simics-target-debug' && callStackItemType == 'stackFrame'",

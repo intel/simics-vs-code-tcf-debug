@@ -476,7 +476,7 @@ export class TcfDebugSession extends DebugSession {
         if (await this.memoryRequest(command, response, args)) {
             return;
         }
-        if (command === "getSymbolContexts") {
+        if (command === "getSymbolContexts" || command === "getFunctionBreakpointContexts") {
             await this.handle(response, async () => {
                 let ids: string[];
                 if (this.channel?.hasService("ContextQuery")) {
@@ -488,7 +488,11 @@ export class TcfDebugSession extends DebugSession {
                 } else {
                     ids = this.contextOrder.filter((id) => this.contexts.get(id)?.HasState === true);
                 }
-                response.body = ids.map((id) => ({ id, name: this.contextDisplayName(id) }));
+                response.body = ids.map((id) => ({
+                    id,
+                    name: this.contextDisplayName(id),
+                    ...(command === "getFunctionBreakpointContexts" && { threadId: this.threadIdByCtx.get(id) }),
+                }));
             });
             return;
         }

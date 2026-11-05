@@ -72,6 +72,44 @@ function fakeHost(threads: string[]): BreakpointHost & { events: unknown[] } {
     };
 }
 
+test("function breakpoint names preserve explicit context scopes", async () => {
+    const agent = fakeAgent();
+    const manager = new BreakpointManager(agent.service, fakeHost(["thread1"]));
+    await manager.setFunctionBreakpoints([
+        { name: "start_kernel @ armv8.cluster[0].core[0]", condition: "ready", hitCondition: "3" },
+        { name: "start_kernel" },
+        { name: "start_kernel @ armv8.cluster[1].core[0]" },
+    ]);
+    const properties = agent.commands.map(([, props]) => props as BreakpointProperties);
+    assert.equal(properties[0].Location, "start_kernel");
+    assert.deepEqual(properties[0].ContextIds, ["armv8.cluster[0].core[0]"]);
+    assert.equal(properties[0].Condition, "ready");
+    assert.equal(properties[0].IgnoreCount, 2);
+    assert.equal(properties[1].Location, "start_kernel");
+    assert.equal(properties[1].ContextIds, undefined);
+    assert.deepEqual(properties[2].ContextIds, ["armv8.cluster[1].core[0]"]);
+    await manager.setFunctionBreakpoints([{ name: "start_kernel @ armv8.cluster[0].core[0]", condition: "updated" }]);
+    const changed = agent.commands.find(([command]) => command === "change")?.[1] as BreakpointProperties;
+    assert.equal(changed.ID, properties[0].ID);
+    assert.deepEqual(changed.ContextIds, properties[0].ContextIds);
+});
+
+test("scoped function breakpoints never fall back to global planting", async () => {
+    const agent = fakeAgent();
+    agent.caps.ContextIds = false;
+    const manager = new BreakpointManager(agent.service, fakeHost(["thread1"]));
+    const [unsupported, missingContext, missingSymbol] = await manager.setFunctionBreakpoints([
+        { name: "start_kernel @ cpu0" },
+        { name: "start_kernel @ " },
+        { name: " @ cpu0" },
+    ]);
+    assert.equal(unsupported.verified, false);
+    assert.match(unsupported.message ?? "", /ContextIds support/);
+    assert.match(missingContext.message ?? "", /symbol @ context ID/);
+    assert.match(missingSymbol.message ?? "", /symbol @ context ID/);
+    assert.equal(agent.commands.length, 0);
+});
+
 test("path map edits remap planted source breakpoints without changing IDs", async () => {
     const agent = fakeAgent();
     const host = fakeHost(["thread1"]);

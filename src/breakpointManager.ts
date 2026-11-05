@@ -218,10 +218,24 @@ export class BreakpointManager {
         const caps = await this.capabilities();
         const specs = requested.map((r): BreakpointSpec => {
             const spec: BreakpointSpec = { kind: "function", key: r.name };
+            const separator = r.name.lastIndexOf(" @ ");
+            const contextId = separator >= 0 ? r.name.slice(separator + 3).trim() : undefined;
+            const location = separator >= 0 ? r.name.slice(0, separator).trim() : r.name;
             if (caps.Location === false) {
                 return { ...spec, error: "The TCF agent does not support breakpoints on expressions" };
             }
-            return this.withCommonProps(spec, { Location: r.name }, r, caps);
+            if (separator >= 0 && (!contextId || !location)) {
+                return { ...spec, error: "Use 'symbol @ context ID' for a context-scoped function breakpoint" };
+            }
+            if (contextId && caps.ContextIds === false) {
+                return { ...spec, error: "Context-scoped function breakpoints require breakpoint ContextIds support" };
+            }
+            return this.withCommonProps(
+                spec,
+                { Location: location, ...(contextId && { ContextIds: [contextId] }) },
+                r,
+                caps,
+            );
         });
         this.functionBreakpoints = await this.update(this.functionBreakpoints, specs);
         return this.report(this.functionBreakpoints);

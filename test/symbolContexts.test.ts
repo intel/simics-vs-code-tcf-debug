@@ -11,6 +11,7 @@ test("symbol context suggestions query the agent for stateful cores", async () =
         channel: TcfChannel;
         contexts: Map<string, RunControlContext>;
         contextOrder: string[];
+        threadIdByCtx: Map<string, number>;
     };
     const commands: unknown[][] = [];
     state.channel = {
@@ -23,9 +24,10 @@ test("symbol context suggestions query the agent for stateful cores", async () =
     state.contexts.set("board", { ID: "board", Name: "board", IsContainer: true });
     state.contexts.set("core-0", { ID: "core-0", ParentID: "board", Name: "cpu0", HasState: true });
     state.contextOrder.push("board", "core-0");
+    state.threadIdByCtx.set("core-0", 7);
 
     let sequence = 0;
-    function listContexts(): Promise<DebugProtocol.Response> {
+    function listContexts(command = "getSymbolContexts"): Promise<DebugProtocol.Response> {
         return new Promise((resolve) => {
             const next = ++sequence;
             const listener = session.onDidSendMessage((message) => {
@@ -38,15 +40,21 @@ test("symbol context suggestions query the agent for stateful cores", async () =
             session.handleMessage({
                 seq: next,
                 type: "request",
-                command: "getSymbolContexts",
+                command,
             } as DebugProtocol.Request);
         });
     }
 
     assert.deepEqual((await listContexts()).body, [{ id: "core-0", name: "board.cpu0" }]);
     assert.deepEqual(commands, [["ContextQuery", "query", "HasState=true"]]);
+    assert.deepEqual((await listContexts("getFunctionBreakpointContexts")).body, [
+        { id: "core-0", name: "board.cpu0", threadId: 7 },
+    ]);
     state.channel = { hasService: () => false } as unknown as TcfChannel;
     assert.deepEqual((await listContexts()).body, [{ id: "core-0", name: "board.cpu0" }]);
+    assert.deepEqual((await listContexts("getFunctionBreakpointContexts")).body, [
+        { id: "core-0", name: "board.cpu0", threadId: 7 },
+    ]);
     state.contexts.delete("core-0");
     assert.deepEqual((await listContexts()).body, []);
 });

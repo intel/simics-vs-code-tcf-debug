@@ -7,6 +7,7 @@ import { parseInstructionReference } from "./disassembly";
 import { registerFunctionHeaderFileSystem } from "./functionHeaderFileSystem";
 import { applyAndSave, registerLaunchSettings } from "./launchSettings/editorProvider";
 import { setNamedConfigurationValue } from "./launchSettings/launchJson";
+import { formatFunctionBreakpointName } from "./functionBreakpoint";
 import { MissingSource, SourceLocator } from "./locateSource";
 import { pathMapProblems } from "./pathMapper";
 import { registerPathMapView } from "./pathMapView";
@@ -225,7 +226,7 @@ async function addFunctionBreakpointInContext(
         if (!symbol?.trim()) {
             return;
         }
-        const name = context.id ? `${symbol.trim()} @ ${context.id}` : symbol.trim();
+        const name = formatFunctionBreakpointName(symbol.trim(), context.id);
         if (
             !vscode.debug.breakpoints.some((bp) => bp instanceof vscode.FunctionBreakpoint && bp.functionName === name)
         ) {

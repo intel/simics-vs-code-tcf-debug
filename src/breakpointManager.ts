@@ -11,6 +11,7 @@ import {
 } from "./tcf/services/breakpoints";
 import { toBigInt } from "./tcf/json";
 import { instructionReference, parseInstructionReference } from "./disassembly";
+import { parseFunctionBreakpointName } from "./functionBreakpoint";
 import type { TargetPath } from "./pathMapper";
 
 type BreakpointKind = "source" | "function" | "data" | "instruction";
@@ -218,13 +219,11 @@ export class BreakpointManager {
         const caps = await this.capabilities();
         const specs = requested.map((r): BreakpointSpec => {
             const spec: BreakpointSpec = { kind: "function", key: r.name };
-            const separator = r.name.lastIndexOf(" @ ");
-            const contextId = separator >= 0 ? r.name.slice(separator + 3).trim() : undefined;
-            const location = separator >= 0 ? r.name.slice(0, separator).trim() : r.name;
+            const { location, contextId, hasContextDelimiter } = parseFunctionBreakpointName(r.name);
             if (caps.Location === false) {
                 return { ...spec, error: "The TCF agent does not support breakpoints on expressions" };
             }
-            if (separator >= 0 && (!contextId || !location)) {
+            if (hasContextDelimiter && (!contextId || !location)) {
                 return { ...spec, error: "Use 'symbol @ context ID' for a context-scoped function breakpoint" };
             }
             if (contextId && caps.ContextIds === false) {

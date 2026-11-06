@@ -74,22 +74,31 @@ function fakeHost(threads: string[]): BreakpointHost & { events: unknown[] } {
 }
 
 test("function breakpoint names preserve explicit context scopes", async () => {
-    assert.deepEqual(parseFunctionBreakpointName(formatFunctionBreakpointName("start_kernel", "cpu0")), {
+    assert.deepEqual(parseFunctionBreakpointName(formatFunctionBreakpointName("start_kernel", ["cpu0"])), {
         location: "start_kernel",
-        contextId: "cpu0",
+        contextIds: ["cpu0"],
         hasContextDelimiter: true,
+        hasEmptyContext: false,
+    });
+    assert.equal(formatFunctionBreakpointName("start_kernel", ["cpu0", "cpu1"]), "start_kernel @ cpu0, cpu1");
+    assert.deepEqual(parseFunctionBreakpointName("start_kernel @ cpu0,cpu1 , cpu0"), {
+        location: "start_kernel",
+        contextIds: ["cpu0", "cpu1"],
+        hasContextDelimiter: true,
+        hasEmptyContext: false,
     });
     assert.deepEqual(parseFunctionBreakpointName(formatFunctionBreakpointName("start_kernel")), {
         location: "start_kernel",
-        contextId: undefined,
+        contextIds: [],
         hasContextDelimiter: false,
+        hasEmptyContext: false,
     });
     const agent = fakeAgent();
     const manager = new BreakpointManager(agent.service, fakeHost(["thread1"]));
     await manager.setFunctionBreakpoints([
         { name: "start_kernel @ armv8.cluster[0].core[0]", condition: "ready", hitCondition: "3" },
         { name: "start_kernel" },
-        { name: "start_kernel @ armv8.cluster[1].core[0]" },
+        { name: "start_kernel @ armv8.cluster[1].core[0], armv8.cluster[1].core[1]" },
     ]);
     const properties = agent.commands.map(([, props]) => props as BreakpointProperties);
     assert.equal(properties[0].Location, "start_kernel");
@@ -98,7 +107,8 @@ test("function breakpoint names preserve explicit context scopes", async () => {
     assert.equal(properties[0].IgnoreCount, 2);
     assert.equal(properties[1].Location, "start_kernel");
     assert.equal(properties[1].ContextIds, undefined);
-    assert.deepEqual(properties[2].ContextIds, ["armv8.cluster[1].core[0]"]);
+    assert.equal(properties[2].Location, "start_kernel");
+    assert.deepEqual(properties[2].ContextIds, ["armv8.cluster[1].core[0]", "armv8.cluster[1].core[1]"]);
     await manager.setFunctionBreakpoints([{ name: "start_kernel @ armv8.cluster[0].core[0]", condition: "updated" }]);
     const changed = agent.commands.find(([command]) => command === "change")?.[1] as BreakpointProperties;
     assert.equal(changed.ID, properties[0].ID);
@@ -109,15 +119,17 @@ test("scoped function breakpoints never fall back to global planting", async () 
     const agent = fakeAgent();
     agent.caps.ContextIds = false;
     const manager = new BreakpointManager(agent.service, fakeHost(["thread1"]));
-    const [unsupported, missingContext, missingSymbol] = await manager.setFunctionBreakpoints([
+    const [unsupported, missingContext, missingSymbol, emptyEntry] = await manager.setFunctionBreakpoints([
         { name: "start_kernel @ cpu0" },
         { name: "start_kernel @ " },
         { name: " @ cpu0" },
+        { name: "start_kernel @ cpu0, , cpu1" },
     ]);
     assert.equal(unsupported.verified, false);
     assert.match(unsupported.message ?? "", /ContextIds support/);
     assert.match(missingContext.message ?? "", /symbol @ context ID/);
     assert.match(missingSymbol.message ?? "", /symbol @ context ID/);
+    assert.match(emptyEntry.message ?? "", /symbol @ ID1, ID2/);
     assert.equal(agent.commands.length, 0);
 });
 

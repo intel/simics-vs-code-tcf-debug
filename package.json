@@ -2,7 +2,7 @@
     "name": "simics-target-debug",
     "displayName": "Simics Target Debug",
     "description": "Debug targets through a Target Communication Framework (TCF) agent, such as the Simics TCF agent.",
-    "version": "1.0.0",
+    "version": "0.5.0",
     "publisher": "intel-simics",
     "private": true,
     "license": "MIT",

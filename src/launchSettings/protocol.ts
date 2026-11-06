@@ -12,8 +12,8 @@ export interface StateMessage {
     select?: number;
     /** Host paths that do not exist, as "<configuration index>:<JsonPath joined by />". */
     missingPaths: string[];
-    /** A Simics Target Debug session runs or is starting, only one is allowed. */
-    debugging: boolean;
+    /** Agents (see agentAddress) a Simics Target Debug session runs on or is starting on. */
+    busyAgents: string[];
     /** Values of the fields stored in VS Code settings, by field key. */
     settings: Record<string, SettingValue>;
 }

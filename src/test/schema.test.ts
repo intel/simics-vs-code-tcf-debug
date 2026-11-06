@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import * as fs from "fs";
 import * as path from "path";
 import {
+    agentAddress,
     editList,
     fieldPath,
     fieldsFromSchema,
@@ -306,4 +307,12 @@ test("parseInput converts typed text to values", () => {
     assert.deepEqual(parseInput("stringOrInteger", "99999999999999999999"), {
         value: "99999999999999999999",
     });
+});
+
+// The form's start button is only blocked for configurations on an agent that
+// already has a session, so the address must match the debug session's defaults.
+test("agentAddress defaults to the debug session's host and port", () => {
+    assert.equal(agentAddress({}), "localhost:1534");
+    assert.equal(agentAddress({ host: "simhost", port: 1600 }), "simhost:1600");
+    assert.notEqual(agentAddress({ port: 1534 }), agentAddress({ port: 1535 }));
 });

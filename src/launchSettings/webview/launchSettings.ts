@@ -1,6 +1,7 @@
 import type { LaunchConfiguration } from "../launchJson";
 import type { JsonPath, StateMessage, WebviewMessage } from "../protocol";
 import {
+    agentAddress,
     editList,
     Field,
     FieldKind,
@@ -207,10 +208,8 @@ function renderList(configs: LaunchConfiguration[], active: LaunchConfiguration 
     );
 }
 
-/** host:port of the agent, with the same defaults as the debug session. */
 function address(config: LaunchConfiguration): string {
-    const { host, port } = config.values;
-    return `${String(host ?? "localhost")}:${String(port ?? 1534)}`;
+    return agentAddress(config.values);
 }
 
 /** Start, Duplicate and Delete for one configuration. */
@@ -237,8 +236,8 @@ function itemActions(config: LaunchConfiguration): HTMLElement {
 
 /** Why the configuration cannot be started now, if it cannot. */
 function startProblem(config: LaunchConfiguration): string | undefined {
-    if (state?.debugging) {
-        return "A Simics Target Debug session is already running";
+    if (state?.busyAgents.includes(address(config))) {
+        return `A Simics Target Debug session to ${address(config)} is already running`;
     }
     const empty = (v: unknown) => v === undefined || v === "";
     const emptyCell = (row: unknown, key: string) => empty((row as Record<string, unknown> | null)?.[key]);

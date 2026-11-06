@@ -4,6 +4,12 @@ All notable changes to the Simics Target Debug extension will be documented here
 
 ## [Unreleased]
 
+### Changed
+
+- In TCF Launch Configurations, the Start, Duplicate and Delete buttons
+  above the form, and the Add and Delete All buttons above the list, stay
+  visible when you scroll.
+
 ### Fixed
 
 - The Start button in TCF Launch Configurations is no longer disabled while

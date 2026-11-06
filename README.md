@@ -192,15 +192,30 @@ is not used, to stay within the TCF specification.
 
 Use **Simics Target Debug: Add Function Breakpoint in Context...** from the
 Command Palette, the Breakpoints toolbar, or a stack frame's context menu to
-choose a core before entering the symbol. The selected call-stack context is
-offered first; **All contexts** keeps the breakpoint global. Scoped entries
-appear as `start_kernel @ armv8.cluster[0].core[0]` in the Breakpoints panel.
-The ` @ ` suffix is reserved for the exact TCF context ID and is saved with
-the breakpoint; selecting another frame does not change its scope. The same
-syntax can be entered or edited using the built-in function-breakpoint `+`.
+check one or more cores before entering the symbol. The selected call-stack
+context is listed first and checked; accept with nothing checked to keep the
+breakpoint global. Scoped entries appear as
+`start_kernel @ armv8.cluster[0].core[0]` in the Breakpoints panel, or with a
+comma-separated list such as
+`start_kernel @ armv8.cluster[0].core[0], armv8.cluster[0].core[1]` when
+several cores are checked. The ` @ ` suffix is reserved for the exact TCF
+context IDs, which are sent as the breakpoint's `ContextIds` and saved with
+the breakpoint; selecting another frame does not change its scope. Context IDs
+that contain commas cannot be used. The same syntax can be entered or edited
+using the built-in function-breakpoint `+` or **Edit Function Breakpoint...**.
 Scoped function breakpoints require the agent's `ContextIds` support and are
 never silently planted globally when it is unavailable. Their scope applies
-to that context (and, for a process context, its threads), not other cores.
+to those contexts (and, for a process context, its threads), not other cores.
+
+To change the contexts of an existing function breakpoint, use **Simics Target
+Debug: Edit Function Breakpoint Contexts...** from the Command Palette or the
+edit icon in the Breakpoints toolbar. VS Code does not tell extensions which
+breakpoint is selected in the Breakpoints panel, so the command asks for the
+function breakpoint when there is more than one. The checklist starts with the
+breakpoint's current contexts checked; contexts that are not in the current
+session stay listed so they are not dropped by accident. The breakpoint is
+replaced by one with the new name and the same enabled state, condition, hit
+count, and log message, so it moves to the end of the Breakpoints panel.
 
 In **Symbol Files**, right-click a configured symbol file with a context and
 select **Add Function Breakpoint...** to enter a symbol directly. The breakpoint

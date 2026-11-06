@@ -7,7 +7,13 @@ import { parseInstructionReference } from "./disassembly";
 import { registerFunctionHeaderFileSystem } from "./functionHeaderFileSystem";
 import { applyAndSave, registerLaunchSettings } from "./launchSettings/editorProvider";
 import { setNamedConfigurationValue } from "./launchSettings/launchJson";
-import { formatFunctionBreakpointName } from "./functionBreakpoint";
+import {
+    FunctionBreakpointContext,
+    FunctionBreakpointContextChoice,
+    formatFunctionBreakpointName,
+    functionBreakpointContextChoices,
+    parseFunctionBreakpointName,
+} from "./functionBreakpoint";
 import { MissingSource, SourceLocator } from "./locateSource";
 import { pathMapProblems } from "./pathMapper";
 import { registerPathMapView } from "./pathMapView";
@@ -97,6 +103,10 @@ export function activate(context: vscode.ExtensionContext): void {
             (_source: unknown, frameContext: unknown) => addFunctionBreakpointInContext(sessions, frameContext),
         ),
         vscode.commands.registerCommand(
+            "simics-target-debug.editFunctionBreakpointContexts",
+            editFunctionBreakpointContexts,
+        ),
+        vscode.commands.registerCommand(
             "simics-target-debug.addSymbolFileBreakpoint",
             (item?: SymbolFileViewItem) => item && addFunctionBreakpointInContext(sessions, undefined, item),
         ),
@@ -182,51 +192,26 @@ async function addFunctionBreakpointInContext(
     }
     const threadId = frame?.threadId ?? (active?.session.id === session.id ? active.threadId : undefined);
     try {
-        const contexts = (await session.customRequest(
-            "getFunctionBreakpointContexts",
-            symbolFile ? { includeContainers: true } : undefined,
-        )) as {
-            id: string;
-            name: string;
-            threadId?: number;
-        }[];
+        const contexts = await functionBreakpointContexts(session, symbolFile !== undefined);
         const selected = contexts.find((context) => threadId !== undefined && context.threadId === threadId);
-        const choices: SymbolContextChoice[] = [
-            ...(selected
-                ? [
-                      {
-                          label: selected.name,
-                          description: "Selected call-stack context",
-                          detail: selected.id,
-                          id: selected.id,
-                      },
-                  ]
-                : []),
-            { label: "All contexts", description: "No context filter", id: "" },
-            ...contexts
-                .filter((context) => context !== selected)
-                .map((context) => ({ label: context.name, description: context.id, id: context.id })),
-        ];
-        const context = symbolFile
-            ? { id: symbolFileBreakpointContext(symbolFile.file, contexts) }
-            : await vscode.window.showQuickPick(choices, {
-                  title: "Function Breakpoint Context",
-                  placeHolder: "Choose a core or all contexts",
-                  matchOnDescription: true,
-                  matchOnDetail: true,
-              });
-        if (!context) {
+        const contextIds = symbolFile
+            ? [symbolFileBreakpointContext(symbolFile.file, contexts)]
+            : await pickFunctionBreakpointContexts(
+                  "Function Breakpoint Contexts",
+                  functionBreakpointContextChoices(contexts, selected ? [selected.id] : [], selected?.id),
+              );
+        if (!contextIds) {
             return;
         }
         const symbol = await vscode.window.showInputBox({
             title: "Add Function Breakpoint",
-            prompt: context.id ? `Symbol in ${context.id}` : "Symbol in all contexts",
+            prompt: contextIds.length > 0 ? `Symbol in ${contextIds.join(", ")}` : "Symbol in all contexts",
             validateInput: (value) => (!value.trim() ? "Enter a symbol or expression" : undefined),
         });
         if (!symbol?.trim()) {
             return;
         }
-        const name = formatFunctionBreakpointName(symbol.trim(), context.id);
+        const name = formatFunctionBreakpointName(symbol.trim(), contextIds);
         if (
             !vscode.debug.breakpoints.some((bp) => bp instanceof vscode.FunctionBreakpoint && bp.functionName === name)
         ) {
@@ -235,6 +220,117 @@ async function addFunctionBreakpointInContext(
     } catch (err) {
         void vscode.window.showErrorMessage(
             `Could not add function breakpoint: ${err instanceof Error ? err.message : String(err)}`,
+        );
+    }
+}
+
+function functionBreakpointContexts(
+    session: vscode.DebugSession,
+    includeContainers: boolean,
+): Promise<(FunctionBreakpointContext & { threadId?: number })[]> {
+    return session.customRequest(
+        "getFunctionBreakpointContexts",
+        includeContainers ? { includeContainers: true } : undefined,
+    ) as Promise<(FunctionBreakpointContext & { threadId?: number })[]>;
+}
+
+/** Returns the checked context IDs, empty for all contexts, or undefined if cancelled. */
+async function pickFunctionBreakpointContexts(
+    title: string,
+    choices: FunctionBreakpointContextChoice[],
+): Promise<string[] | undefined> {
+    const picked = await vscode.window.showQuickPick(choices, {
+        title,
+        placeHolder: "Check the cores to stop in, or check none for all contexts",
+        canPickMany: true,
+        matchOnDescription: true,
+        matchOnDetail: true,
+    });
+    return picked?.map((choice) => choice.id);
+}
+
+/**
+ * Changes the contexts of a function breakpoint. VS Code cannot rename a
+ * breakpoint, so it is replaced by one with the same settings.
+ */
+async function editFunctionBreakpointContexts(): Promise<void> {
+    const active = vscode.debug.activeStackItem;
+    const session = active?.session ?? vscode.debug.activeDebugSession;
+    if (session?.type !== DEBUG_TYPE) {
+        void vscode.window.showErrorMessage(
+            "Start or select an active Simics Target Debug session before editing function breakpoint contexts.",
+        );
+        return;
+    }
+    const breakpoints = vscode.debug.breakpoints.filter(
+        (bp): bp is vscode.FunctionBreakpoint => bp instanceof vscode.FunctionBreakpoint,
+    );
+    if (breakpoints.length === 0) {
+        void vscode.window.showInformationMessage("There are no function breakpoints to edit.");
+        return;
+    }
+    const breakpoint =
+        breakpoints.length === 1
+            ? breakpoints[0]
+            : (
+                  await vscode.window.showQuickPick(
+                      breakpoints.map((bp) => ({
+                          label: bp.functionName,
+                          description: [
+                              !bp.enabled && "Disabled",
+                              bp.condition && `Condition: ${bp.condition}`,
+                              bp.hitCondition && `Hit count: ${bp.hitCondition}`,
+                              bp.logMessage && `Log message: ${bp.logMessage}`,
+                          ]
+                              .filter(Boolean)
+                              .join(", "),
+                          breakpoint: bp,
+                      })),
+                      { title: "Edit Function Breakpoint Contexts", placeHolder: "Choose a function breakpoint" },
+                  )
+              )?.breakpoint;
+    if (!breakpoint) {
+        return;
+    }
+    const { location, contextIds } = parseFunctionBreakpointName(breakpoint.functionName);
+    if (!location) {
+        void vscode.window.showErrorMessage(`'${breakpoint.functionName}' has no symbol to scope.`);
+        return;
+    }
+    try {
+        const contexts = await functionBreakpointContexts(session, false);
+        const threadId = active?.session.id === session.id ? active.threadId : undefined;
+        const selected = contexts.find((context) => threadId !== undefined && context.threadId === threadId);
+        const ids = await pickFunctionBreakpointContexts(
+            `Contexts for ${location}`,
+            functionBreakpointContextChoices(contexts, contextIds, selected?.id),
+        );
+        if (!ids) {
+            return;
+        }
+        const name = formatFunctionBreakpointName(location, ids);
+        if (name === breakpoint.functionName) {
+            return;
+        }
+        if (
+            vscode.debug.breakpoints.some((bp) => bp instanceof vscode.FunctionBreakpoint && bp.functionName === name)
+        ) {
+            void vscode.window.showErrorMessage(`The function breakpoint '${name}' already exists.`);
+            return;
+        }
+        vscode.debug.removeBreakpoints([breakpoint]);
+        vscode.debug.addBreakpoints([
+            new vscode.FunctionBreakpoint(
+                name,
+                breakpoint.enabled,
+                breakpoint.condition,
+                breakpoint.hitCondition,
+                breakpoint.logMessage,
+            ),
+        ]);
+    } catch (err) {
+        void vscode.window.showErrorMessage(
+            `Could not edit function breakpoint contexts: ${err instanceof Error ? err.message : String(err)}`,
         );
     }
 }

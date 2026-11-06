@@ -34,6 +34,12 @@
                 "icon": "$(debug-breakpoint-function)"
             },
             {
+                "command": "simics-target-debug.editFunctionBreakpointContexts",
+                "title": "Edit Function Breakpoint Contexts...",
+                "category": "Simics Target Debug",
+                "icon": "$(edit)"
+            },
+            {
                 "command": "simics-target-debug.addPathMapRule",
                 "title": "Add Path Map Rule...",
                 "category": "Simics Target Debug",
@@ -257,6 +263,10 @@
                     "when": "debugType == 'simics-target-debug'"
                 },
                 {
+                    "command": "simics-target-debug.editFunctionBreakpointContexts",
+                    "when": "debugType == 'simics-target-debug'"
+                },
+                {
                     "command": "simics-target-debug.saveSymbolFiles",
                     "when": "debugType == 'simics-target-debug'"
                 },
@@ -405,8 +415,13 @@
             "view/title": [
                 {
                     "command": "simics-target-debug.addFunctionBreakpointInContext",
-                    "when": "view == 'workbench.debug.viewlet.state' && debugType == 'simics-target-debug'",
-                    "group": "navigation@1"
+                    "when": "view == 'workbench.debug.breakPointsView' && debugType == 'simics-target-debug'",
+                    "group": "navigation@10.1"
+                },
+                {
+                    "command": "simics-target-debug.editFunctionBreakpointContexts",
+                    "when": "view == 'workbench.debug.breakPointsView' && debugType == 'simics-target-debug'",
+                    "group": "navigation@10.2"
                 },
                 {
                     "command": "simics-target-debug.openConsole",

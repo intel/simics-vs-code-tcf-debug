@@ -42,8 +42,12 @@ body {
     border-right: 1px solid var(--vscode-panel-border, var(--vscode-widget-border, transparent));
 }
 
-/* Looks like the title of a VS Code view. */
+/* Looks like the title of a VS Code view. Sticky, so its buttons stay visible in a long list. */
 .list-header {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: var(--vscode-editor-background);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -129,14 +133,26 @@ body {
 .details {
     overflow: auto;
     padding: 0 24px 24px;
+    /* Fields that get focus are scrolled into view below the sticky header. */
+    scroll-padding-top: 40px;
 }
 
+/*
+ * Sticky, so Start, Duplicate and Delete stay visible when the form is scrolled.
+ * Spans the side padding of .details too, so no field shows beside it.
+ * Below the drop-down lists (z-index 10), which may open over it.
+ */
 .details-header {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: var(--vscode-editor-background);
     display: flex;
     align-items: center;
     justify-content: flex-end;
     gap: 12px;
-    padding: 10px 14px 0;
+    margin: 0 -24px;
+    padding: 10px 38px 4px;
 }
 
 .actions {

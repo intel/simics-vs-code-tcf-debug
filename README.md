@@ -207,6 +207,16 @@ Scoped function breakpoints require the agent's `ContextIds` support and are
 never silently planted globally when it is unavailable. Their scope applies
 to those contexts (and, for a process context, its threads), not other cores.
 
+To change the contexts of an existing function breakpoint, use **Simics Target
+Debug: Edit Function Breakpoint Contexts...** from the Command Palette or the
+edit icon in the Breakpoints toolbar. VS Code does not tell extensions which
+breakpoint is selected in the Breakpoints panel, so the command asks for the
+function breakpoint when there is more than one. The checklist starts with the
+breakpoint's current contexts checked; contexts that are not in the current
+session stay listed so they are not dropped by accident. The breakpoint is
+replaced by one with the new name and the same enabled state, condition, hit
+count, and log message, so it moves to the end of the Breakpoints panel.
+
 In **Symbol Files**, right-click a configured symbol file with a context and
 select **Add Function Breakpoint...** to enter a symbol directly. The breakpoint
 uses the file's context rather than the selected call-stack core. Context names

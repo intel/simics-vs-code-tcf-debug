@@ -2,7 +2,7 @@ name: Tests
 
 on:
     push:
-        branches: [main, plugin-from-scatch]
+        branches: main
     pull_request:
     workflow_dispatch:
     schedule:

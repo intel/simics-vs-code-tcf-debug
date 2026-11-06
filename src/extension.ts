@@ -199,34 +199,37 @@ async function addFunctionBreakpointInContext(
                           description: "Selected call-stack context",
                           detail: selected.id,
                           id: selected.id,
+                          picked: true,
                       },
                   ]
                 : []),
-            { label: "All contexts", description: "No context filter", id: "" },
             ...contexts
                 .filter((context) => context !== selected)
                 .map((context) => ({ label: context.name, description: context.id, id: context.id })),
         ];
-        const context = symbolFile
-            ? { id: symbolFileBreakpointContext(symbolFile.file, contexts) }
-            : await vscode.window.showQuickPick(choices, {
-                  title: "Function Breakpoint Context",
-                  placeHolder: "Choose a core or all contexts",
-                  matchOnDescription: true,
-                  matchOnDetail: true,
-              });
-        if (!context) {
+        const contextIds = symbolFile
+            ? [symbolFileBreakpointContext(symbolFile.file, contexts)]
+            : (
+                  await vscode.window.showQuickPick(choices, {
+                      title: "Function Breakpoint Contexts",
+                      placeHolder: "Check the cores to stop in, or check none for all contexts",
+                      canPickMany: true,
+                      matchOnDescription: true,
+                      matchOnDetail: true,
+                  })
+              )?.map((choice) => choice.id);
+        if (!contextIds) {
             return;
         }
         const symbol = await vscode.window.showInputBox({
             title: "Add Function Breakpoint",
-            prompt: context.id ? `Symbol in ${context.id}` : "Symbol in all contexts",
+            prompt: contextIds.length > 0 ? `Symbol in ${contextIds.join(", ")}` : "Symbol in all contexts",
             validateInput: (value) => (!value.trim() ? "Enter a symbol or expression" : undefined),
         });
         if (!symbol?.trim()) {
             return;
         }
-        const name = formatFunctionBreakpointName(symbol.trim(), context.id);
+        const name = formatFunctionBreakpointName(symbol.trim(), contextIds);
         if (
             !vscode.debug.breakpoints.some((bp) => bp instanceof vscode.FunctionBreakpoint && bp.functionName === name)
         ) {

@@ -290,6 +290,47 @@ async function addSymbolFile(symbolFiles: SymbolFilesProvider): Promise<void> {
 interface SymbolPathChoice extends vscode.QuickPickItem {
     path: string;
     directory?: boolean;
+    browse?: "file" | "folder";
+}
+
+const BROWSE_CHOICES: SymbolPathChoice[] = [
+    { label: "$(file) Browse for a File...", path: "", browse: "file", alwaysShow: true },
+    { label: "$(folder-opened) Browse for a Folder...", path: "", browse: "folder", alwaysShow: true },
+];
+
+async function browseSymbolPath(
+    pick: "file" | "folder",
+    typed: string,
+    workspaceFolder?: string,
+): Promise<string | undefined> {
+    const uris = await vscode.window.showOpenDialog({
+        canSelectFiles: pick === "file",
+        canSelectFolders: pick === "folder",
+        canSelectMany: false,
+        defaultUri: startFolder(typed, workspaceFolder),
+        openLabel: "Select",
+    });
+    return uris?.[0]?.fsPath;
+}
+
+// A file as defaultUri makes VS Code's simple file dialog behave like a save dialog.
+function startFolder(typed: string, workspaceFolder?: string): vscode.Uri | undefined {
+    const value = typed.trim();
+    const resolved = !value
+        ? undefined
+        : path.isAbsolute(value)
+          ? value
+          : workspaceFolder && path.join(workspaceFolder, value);
+    for (const candidate of resolved ? [resolved, path.dirname(resolved)] : []) {
+        try {
+            if (fs.statSync(candidate).isDirectory()) {
+                return vscode.Uri.file(candidate);
+            }
+        } catch {
+            // Try the next candidate.
+        }
+    }
+    return workspaceFolder ? vscode.Uri.file(workspaceFolder) : undefined;
 }
 
 function promptSymbolFilePath(workspaceFolder?: string, initialPath = ""): Promise<string | undefined> {
@@ -311,17 +352,38 @@ function promptSymbolFilePath(workspaceFolder?: string, initialPath = ""): Promi
 
         async function update(value: string): Promise<void> {
             const typed = value.trim();
-            const manual: SymbolPathChoice[] = typed
-                ? [{ label: typed, description: "Use this path", path: typed }]
-                : [];
+            const manual: SymbolPathChoice[] = [
+                ...(typed ? [{ label: typed, description: "Use this path", path: typed }] : []),
+                ...BROWSE_CHOICES,
+            ];
             picker.items = manual;
             picker.busy = true;
             const suggestions = await suggestSymbolPaths(value, workspaceFolder);
             if (finished || picker.value !== value) {
                 return;
             }
+            const listed = value === "" || value.endsWith(path.sep) ? value : undefined;
+            const listedFolder =
+                listed === undefined
+                    ? undefined
+                    : path.isAbsolute(listed)
+                      ? listed
+                      : workspaceFolder && path.resolve(workspaceFolder, listed);
+            const parent: SymbolPathChoice[] =
+                listed !== undefined && listedFolder && path.dirname(listedFolder) !== path.resolve(listedFolder)
+                    ? [
+                          {
+                              label: "..",
+                              description: "Parent Folder",
+                              path: path.join(listed, ".."),
+                              directory: true,
+                              alwaysShow: true,
+                          },
+                      ]
+                    : [];
             picker.items = [
                 ...manual,
+                ...parent,
                 ...suggestions.map((suggestion) => ({
                     label: suggestion.path + (suggestion.directory ? path.sep : ""),
                     description: suggestion.directory ? "Folder" : "File",
@@ -337,7 +399,12 @@ function promptSymbolFilePath(workspaceFolder?: string, initialPath = ""): Promi
         });
         picker.onDidAccept(() => {
             const selected = picker.activeItems[0];
-            if (selected?.directory) {
+            if (selected?.browse) {
+                const typed = picker.value;
+                finished = true;
+                picker.dispose();
+                resolve(browseSymbolPath(selected.browse, typed, workspaceFolder));
+            } else if (selected?.directory) {
                 picker.value = selected.path + path.sep;
             } else if (selected?.path || picker.value.trim()) {
                 finish(selected?.path ?? picker.value.trim());

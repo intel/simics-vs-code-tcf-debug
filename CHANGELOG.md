@@ -12,6 +12,10 @@ All notable changes to the Simics Target Debug extension will be documented here
 
 ### Fixed
 
+- Source breakpoints no longer get a `target=` prefix on their file name
+  when the agent has a path map rule for the target file system, such as
+  `add-pathmap-entry "target=/host" ...` for binaries found by the Linux
+  tracker. Such breakpoints never resolved.
 - The file pickers for symbol files now offer the standard file dialog, a `..` entry, and pick files in the
   current folder ([#29](https://github.com/intel/simics-vs-code-tcf-debug/issues/29)).
 

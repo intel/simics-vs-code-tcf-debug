@@ -169,6 +169,10 @@ export class PathMapper {
      * Rules the agent got elsewhere, for example from the Simics command
      * add-pathmap-entry, are not used by the agent for breakpoints, so those
      * are applied in reverse here.
+     *
+     * Rules with a "target=" source are skipped. The Simics agent uses that
+     * prefix for files in the target's file system, such as binaries found
+     * by the OS awareness tracker, never for paths in the debug information.
      */
     async toTarget(hostPath: string, contextId?: string): Promise<string> {
         return (await this.toTargetLocation(hostPath, contextId)).path;
@@ -176,6 +180,9 @@ export class PathMapper {
 
     async toTargetLocation(hostPath: string, contextId?: string): Promise<TargetPath> {
         for (const r of this.rules) {
+            if (isTargetFileSystemPath(r.source)) {
+                continue;
+            }
             const p = mapPrefix(hostPath, r.destination, r.source);
             const query = pathMapContextQuery(r);
             if (p !== undefined && query && query !== "*" && query !== "**" && !contextId && !this.service) {
@@ -202,6 +209,9 @@ export class PathMapper {
             }
         }
         for (const r of await this.otherAgentRules()) {
+            if (isTargetFileSystemPath(r.Source!)) {
+                continue;
+            }
             const p = mapPrefix(hostPath, r.Destination!, r.Source!);
             if (p !== undefined && (await this.matches(r.ContextQuery, contextId))) {
                 return {
@@ -398,6 +408,10 @@ export function mapPrefix(file: string, from: string, to: string): string | unde
     }
     const rest = f.slice(prefix.length);
     return `${to.replace(/[\\/]+$/, "")}${rest}`;
+}
+
+function isTargetFileSystemPath(file: string): boolean {
+    return file.startsWith("target=");
 }
 
 function fileExists(file: string): boolean {

@@ -273,6 +273,21 @@ test("toTarget maps agent rules for this host in reverse", async () => {
     }
 });
 
+// Rules like add-pathmap-entry "target=/host" "/" map binaries the tracker
+// reports in the target's file system. Source paths must not get the
+// "target=" prefix, the debug information never contains it.
+test("toTarget does not reverse rules for the target file system", async () => {
+    const fake = fakePathMapService([
+        { Source: "target=/host/disk3", Destination: "/disk3" },
+        { Source: "/build", Destination: "/disk3/ws" },
+    ]);
+    const agent = new PathMapper([], fake.service);
+    assert.equal(await agent.toTarget("/disk3/src/a.c"), "/disk3/src/a.c");
+    assert.equal(await agent.toTarget("/disk3/ws/a.c"), "/build/a.c");
+    const local = new PathMapper([{ source: "target=/host/disk3", destination: "/disk3" }], undefined);
+    assert.equal(await local.toTarget("/disk3/src/a.c"), "/disk3/src/a.c");
+});
+
 // PathMap.get also returns our own rules. They must not be used as agent
 // rules, since the agent already applies them.
 test("toTarget skips the rules this client sent itself", async () => {

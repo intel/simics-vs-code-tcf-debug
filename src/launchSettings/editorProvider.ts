@@ -14,7 +14,7 @@ import {
     setValue,
 } from "./launchJson";
 import { SettingValue, StateMessage, WebviewMessage } from "./protocol";
-import { Field, fieldPath, launchFields, launchTemplate, valueAtPath } from "./schema";
+import { Field, agentAddress, fieldPath, launchFields, launchTemplate, valueAtPath } from "./schema";
 
 /** Must match "customEditors" in package.json. */
 export const LAUNCH_SETTINGS_VIEW_TYPE = "simics-target-debug.launchSettings";
@@ -22,12 +22,14 @@ export const LAUNCH_SETTINGS_VIEW_TYPE = "simics-target-debug.launchSettings";
 const NEW_LAUNCH_JSON = '{\n    "version": "0.2.0",\n    "configurations": []\n}\n';
 
 const tcfSessions = new Set<vscode.DebugSession>();
-/** Set from the form's start until VS Code has started the session or failed. */
-let starting = false;
+/** Agents started from the form, each kept until VS Code has started the session or failed. */
+const startingAgents: string[] = [];
 const debuggingChanged = new vscode.EventEmitter<void>();
 
-function isDebugging(): boolean {
-    return starting || tcfSessions.size > 0;
+/** Agents with a running or starting session, see agentAddress. */
+function busyAgents(): string[] {
+    const running = [...tcfSessions].map((s) => agentAddress(s.configuration));
+    return [...new Set([...running, ...startingAgents])];
 }
 
 /** The values of the fields stored in VS Code settings, see Field.setting. */
@@ -148,7 +150,7 @@ class LaunchSettingsEditorProvider implements vscode.CustomTextEditorProvider {
                 error: result.error,
                 select,
                 missingPaths: [],
-                debugging: isDebugging(),
+                busyAgents: busyAgents(),
                 settings: settingValues(this.fields, document.uri),
             };
             select = undefined;
@@ -249,17 +251,20 @@ class LaunchSettingsEditorProvider implements vscode.CustomTextEditorProvider {
                 return;
             }
             case "start": {
-                if (isDebugging()) {
+                const text = checkedText(document, message.index, message.name);
+                const config = readConfigurations(text).configurations?.find((c) => c.index === message.index);
+                if (!config) {
+                    return;
+                }
+                const agent = agentAddress(config.values);
+                if (busyAgents().includes(agent)) {
                     void vscode.window.showInformationMessage(
-                        "A Simics Target Debug session is already running. " + "Stop it before starting another one.",
+                        `A Simics Target Debug session to ${agent} is already running. ` +
+                            "Stop it before starting another one.",
                     );
                     return;
                 }
-                const text = checkedText(document, message.index, message.name);
-                const config = readConfigurations(text).configurations?.find((c) => c.index === message.index);
-                if (config) {
-                    startDebugging(document, config);
-                }
+                startDebugging(document, config);
                 return;
             }
             case "add": {
@@ -351,7 +356,8 @@ function startDebugging(document: vscode.TextDocument, config: LaunchConfigurati
         ...config.values,
         name: config.name,
     } as vscode.DebugConfiguration;
-    starting = true;
+    const agent = agentAddress(config.values);
+    startingAgents.push(agent);
     debuggingChanged.fire();
     Promise.resolve(vscode.debug.startDebugging(vscode.workspace.getWorkspaceFolder(document.uri), debugConfig))
         .catch((err: unknown) => {
@@ -360,7 +366,7 @@ function startDebugging(document: vscode.TextDocument, config: LaunchConfigurati
             );
         })
         .finally(() => {
-            starting = false;
+            startingAgents.splice(startingAgents.indexOf(agent), 1);
             debuggingChanged.fire();
         });
 }

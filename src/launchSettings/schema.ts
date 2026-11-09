@@ -183,6 +183,12 @@ export function fieldPath(f: Field): string[] {
     return f.path ?? [f.key];
 }
 
+/** host:port of the agent a configuration connects to, with the same defaults as the debug session. */
+export function agentAddress(values: Record<string, unknown>): string {
+    const { host, port } = values;
+    return `${String(host ?? "localhost")}:${String(port ?? 1534)}`;
+}
+
 /** The value at `path` in `values`, if there is one. */
 export function valueAtPath(values: unknown, path: readonly (string | number)[]): unknown {
     let v = values;

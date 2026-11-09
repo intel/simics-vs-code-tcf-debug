@@ -400,11 +400,14 @@ async function pickPath(
     return relative === "" ? "${workspaceFolder}" : `\${workspaceFolder}/${relative.split(path.sep).join("/")}`;
 }
 
-/** The current path if it exists, else its directory if that exists, else the workspace folder. */
+/**
+ * The current path if it is a folder, else its folder if that exists, else the workspace folder.
+ * A file would make VS Code's simple file dialog behave like a save dialog.
+ */
 async function startUri(current: string, folder: string | undefined): Promise<vscode.Uri | undefined> {
     const resolved = current.trim() ? hostPath(current, folder) : undefined;
     for (const candidate of resolved === undefined ? [] : [resolved, path.dirname(resolved)]) {
-        if (await exists(candidate)) {
+        if (await isFolder(candidate)) {
             return vscode.Uri.file(candidate);
         }
     }
@@ -460,6 +463,14 @@ async function exists(file: string): Promise<boolean> {
     try {
         await vscode.workspace.fs.stat(vscode.Uri.file(file));
         return true;
+    } catch {
+        return false;
+    }
+}
+
+async function isFolder(file: string): Promise<boolean> {
+    try {
+        return ((await vscode.workspace.fs.stat(vscode.Uri.file(file))).type & vscode.FileType.Directory) !== 0;
     } catch {
         return false;
     }

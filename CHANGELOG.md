@@ -12,6 +12,9 @@ All notable changes to the Simics Target Debug extension will be documented here
 
 ### Fixed
 
+- The file pickers for symbol files now offer the standard file dialog, a `..` entry, and pick files in the
+  current folder ([#29](https://github.com/intel/simics-vs-code-tcf-debug/issues/29)).
+
 - The Start button in TCF Launch Configurations is no longer disabled while
   any Simics Target Debug session runs, only for configurations that connect
   to an agent (host and port) that already has a session.

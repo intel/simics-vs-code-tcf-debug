@@ -18,7 +18,7 @@ const watchPlugins = () =>
                   setup(build) {
                       let ready = false;
                       build.onStart(() => {
-                          if (running++ === 0 && readyBuilds === (tests ? 1 : 3)) {
+                          if (running++ === 0 && readyBuilds === (tests ? 1 : 4)) {
                               console.log("Build started.");
                           }
                       });
@@ -28,7 +28,7 @@ const watchPlugins = () =>
                               ready = true;
                               readyBuilds++;
                           }
-                          if (running === 0 && readyBuilds === (tests ? 1 : 3)) {
+                          if (running === 0 && readyBuilds === (tests ? 1 : 4)) {
                               console.log("Build complete; watching for changes.");
                           }
                       });
@@ -36,6 +36,20 @@ const watchPlugins = () =>
               },
           ]
         : [];
+
+const tcfCliPlugins = () => [
+    ...watchPlugins(),
+    {
+        name: "make-tcf-cli-executable",
+        setup(build) {
+            build.onEnd((result) => {
+                if (result.errors.length === 0) {
+                    fs.chmodSync("out/tcf-cli.js", 0o755);
+                }
+            });
+        },
+    },
+];
 
 const common = {
     bundle: true,
@@ -65,6 +79,15 @@ const contexts = tests
           }),
       ]
     : [
+          await esbuild.context({
+              ...common,
+              entryPoints: ["src/scripts/tcf-cli.ts"],
+              plugins: tcfCliPlugins(),
+              outfile: "out/tcf-cli.js",
+              banner: { js: "#!/usr/bin/env node\nprocess.setSourceMapsEnabled(true);" },
+              sourcemap: true,
+              logLevel: "warning",
+          }),
           await esbuild.context({
               ...common,
               entryPoints: ["src/extension.ts"],

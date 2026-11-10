@@ -31,6 +31,11 @@ function seededRandom(seed: number): () => number {
     };
 }
 
+// Resolves when the server and all its connections are closed.
+function closeServer(server: net.Server): Promise<void> {
+    return new Promise((resolve, reject) => server.close((err) => (err ? reject(err) : resolve())));
+}
+
 // Each field is followed by a 0 byte, the message ends with ESC 1 (EOM).
 test("encodeMessage ends fields with 0 and messages with ESC 1", () => {
     assert.deepEqual(
@@ -285,7 +290,7 @@ test("TcfChannel trace gives the type, service and name of each message", async 
         await assert.rejects(channel.command("CommandLine", "bogus"), /not supported/);
     } finally {
         channel.close();
-        server.close();
+        await closeServer(server);
     }
     const keyPressed = { service: "CommandLine", name: "keyPressed" };
     const bogus = { service: "CommandLine", name: "bogus" };
@@ -299,5 +304,45 @@ test("TcfChannel trace gives the type, service and name of each message", async 
         ["<-", "R", { type: "command", ...keyPressed }],
         ["->", "C", { type: "command", ...bogus }],
         ["<-", "N", { type: "command", ...bogus }],
+    ]);
+});
+
+test("TcfChannel onAnyEvent gets every event after its own listeners", async () => {
+    const server = net.createServer((socket) => {
+        const r = new MessageReader({
+            message: (fields) => {
+                if (fields[0] !== "C") {
+                    return;
+                }
+                socket.write(encodeMessage(["E", "RunControl", "containerResumed", '["a","b"]']));
+                socket.write(encodeMessage(["E", "Memory", "memoryChanged", '"m"', "[]"]));
+                socket.write(encodeMessage(["R", fields[1], ""]));
+            },
+            endOfStream: () => socket.end(),
+            error: () => undefined,
+        });
+        socket.on("data", (data) => r.push(data as Buffer));
+        socket.write(encodeMessage(["E", "Locator", "Hello", '["RunControl"]']));
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const channel = new TcfChannel();
+    const seen: unknown[][] = [];
+    channel.onEvent("RunControl", "containerResumed", (args) => seen.push(["own", ...args]));
+    const remove = channel.onAnyEvent((service, event, args) => seen.push([service, event, ...args]));
+    try {
+        await channel.connect("127.0.0.1", (server.address() as net.AddressInfo).port, 5000);
+        await channel.command("RunControl", "suspend", "a");
+        remove();
+        await channel.command("RunControl", "suspend", "a");
+    } finally {
+        channel.close();
+        await closeServer(server);
+    }
+    assert.deepEqual(seen, [
+        ["Locator", "Hello", ["RunControl"]],
+        ["own", ["a", "b"]],
+        ["RunControl", "containerResumed", ["a", "b"]],
+        ["Memory", "memoryChanged", "m", []],
+        ["own", ["a", "b"]],
     ]);
 });

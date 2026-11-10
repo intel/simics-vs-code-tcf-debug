@@ -1,4 +1,4 @@
-import { TcfChannel } from "../channel";
+import { TcfChannel } from "@/tcf/channel";
 
 /** RunControl context properties, see TCF Services -> Run Control. */
 export interface RunControlContext {

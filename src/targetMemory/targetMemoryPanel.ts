@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { randomBytes } from "crypto";
-import { formatHex, hexString as hex, parseAddress } from "../shared/targetMemory/format";
+import { formatHex, hexString as hex, parseAddress } from "@/shared/targetMemory/format";
 import {
     TARGET_MEMORY_VIEW_TYPE,
     type ContextMenuCommand,
@@ -9,7 +9,7 @@ import {
     type MenuTarget,
     type TargetState,
     type ToWebview,
-} from "../shared/targetMemory/protocol";
+} from "@/shared/targetMemory/protocol";
 import type { TargetMemoryClient } from "./memoryClient";
 import type { TargetMemoryManager } from "./targetMemoryManager";
 

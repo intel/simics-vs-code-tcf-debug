@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import type { TraceMessage } from "../tcf/channel";
-import { DEFAULT_TRACE_SILENCE, TraceSilenceRule, isSilenced, parseTraceSilence } from "../tcf/traceSilence";
+import type { TraceMessage } from "@/tcf/channel";
+import { DEFAULT_TRACE_SILENCE, TraceSilenceRule, isSilenced, parseTraceSilence } from "@/tcf/traceSilence";
 
 // The default keeps the trace to the debugger's own traffic: no heartbeats or
 // other peer events, and nothing from the Simics console.

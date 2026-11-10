@@ -4,10 +4,10 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { test } from "node:test";
-import { SymbolFile, applySymbolFiles } from "../src/symbolFiles";
-import { TcfChannel } from "../src/tcf/channel";
-import { MemoryMapService, MemoryRegionProperties } from "../src/tcf/services/memoryMap";
-import { TcfDebugSession } from "../src/tcfDebugSession";
+import { SymbolFile, applySymbolFiles } from "@/symbolFiles";
+import { TcfChannel } from "@/tcf/channel";
+import { MemoryMapService, MemoryRegionProperties } from "@/tcf/services/memoryMap";
+import { TcfDebugSession } from "@/tcfDebugSession";
 
 test("removing the last symbol file clears its context map", async () => {
     const calls: { context: string; regions: MemoryRegionProperties[] }[] = [];

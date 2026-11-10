@@ -12,7 +12,7 @@ import {
     setPathMapRules,
     setNamedConfigurationValue,
     uniqueName,
-} from "../launchSettings/launchJson";
+} from "@/launchSettings/launchJson";
 
 const LAUNCH = `{
     // Comment at the top.

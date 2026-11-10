@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { TypeClass, ValueProperties, formatExpressionValue } from "../tcf/services/expressions";
+import { TypeClass, ValueProperties, formatExpressionValue } from "@/tcf/services/expressions";
 
 function format(bytes: number[], properties: ValueProperties): string {
     return formatExpressionValue({ bytes: Buffer.from(bytes), properties });

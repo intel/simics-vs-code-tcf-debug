@@ -1,5 +1,5 @@
-import { alignDown, hexString as hex } from "../../shared/targetMemory/format";
-import type { FromWebview, ToWebview } from "../../shared/targetMemory/protocol";
+import { alignDown, hexString as hex } from "@/shared/targetMemory/format";
+import type { FromWebview, ToWebview } from "@/shared/targetMemory/protocol";
 
 export const BLOCK_SIZE = 1024;
 const BLOCK = BigInt(BLOCK_SIZE);

@@ -1,1 +1,1 @@
-import "../fuzz/fuzzing.test";
+import "@/fuzz/fuzzing.test";

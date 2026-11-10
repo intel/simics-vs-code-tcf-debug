@@ -7,9 +7,9 @@ import {
     DisassemblyCache,
     KnownInstructionStarts,
     parseInstructionReference,
-} from "../disassembly";
-import { TcfError } from "../tcf/channel";
-import { DisassemblyLine } from "../tcf/services/disassembly";
+} from "@/disassembly";
+import { TcfError } from "@/tcf/channel";
+import { DisassemblyLine } from "@/tcf/services/disassembly";
 
 const NOP = Buffer.from([0x90, 0x90, 0x90, 0x90]).toString("base64");
 

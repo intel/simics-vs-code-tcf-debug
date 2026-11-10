@@ -14,8 +14,8 @@ import {
     parseInput,
     toggleChoice,
     valueAtPath,
-} from "../launchSettings/schema";
-import { DEFAULT_TRACE_SILENCE } from "../tcf/traceSilence";
+} from "@/launchSettings/schema";
+import { DEFAULT_TRACE_SILENCE } from "@/tcf/traceSilence";
 
 // The bundled test runs from out/test.
 const PACKAGE_JSON: unknown = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "..", "package.json"), "utf8"));

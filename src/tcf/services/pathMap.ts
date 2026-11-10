@@ -1,4 +1,4 @@
-import { TcfChannel } from "../channel";
+import { TcfChannel } from "@/tcf/channel";
 
 /** Path map rule properties, see TCF Services -> Path Map. */
 export interface PathMapRuleProperties {

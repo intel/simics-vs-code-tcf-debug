@@ -7,7 +7,7 @@ import {
     functionHeaderLine,
     functionHeaderSource,
     functionHeaderText,
-} from "../functionHeaders";
+} from "@/functionHeaders";
 
 /** Lookup over fixed functions, counting the addresses asked for. */
 function fakeLookup(functions: FunctionInfo[]) {

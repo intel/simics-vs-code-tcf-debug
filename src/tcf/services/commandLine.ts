@@ -1,4 +1,4 @@
-import { TcfChannel } from "../channel";
+import { TcfChannel } from "@/tcf/channel";
 
 /*
  * The Simics CommandLine service, see CommandLine-service.md in the Simics TCF

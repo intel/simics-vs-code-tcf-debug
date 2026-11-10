@@ -1,9 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { DebugProtocol } from "@vscode/debugprotocol";
-import { TcfDebugSession } from "../tcfDebugSession";
-import type { MemoryReadResult } from "../tcf/services/memory";
-import * as req from "../tcfRequests";
+import { TcfDebugSession } from "@/tcfDebugSession";
+import type { MemoryReadResult } from "@/tcf/services/memory";
+import * as req from "@/tcfRequests";
 
 /** A debug session with a fake Memory service holding `data` at `base`. */
 function sessionWithMemory(

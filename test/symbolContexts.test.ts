@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { DebugProtocol } from "@vscode/debugprotocol";
-import { TcfChannel } from "../src/tcf/channel";
-import { RunControlContext } from "../src/tcf/services/runControl";
-import { TcfDebugSession } from "../src/tcfDebugSession";
-import { symbolFileBreakpointContext } from "../src/symbolFiles";
+import { TcfChannel } from "@/tcf/channel";
+import { RunControlContext } from "@/tcf/services/runControl";
+import { TcfDebugSession } from "@/tcfDebugSession";
+import { symbolFileBreakpointContext } from "@/symbolFiles";
 
 test("symbol file breakpoints resolve their own context, not the selected thread", () => {
     const contexts = [

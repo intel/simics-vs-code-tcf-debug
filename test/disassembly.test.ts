@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { disassembleInstructions, instructionReference, parseInstructionReference } from "../src/disassembly";
-import { TcfChannel, TcfError } from "../src/tcf/channel";
-import { DisassemblyService } from "../src/tcf/services/disassembly";
-import { DisassemblyLine } from "../src/tcf/services/disassembly";
+import { disassembleInstructions, instructionReference, parseInstructionReference } from "@/disassembly";
+import { TcfChannel, TcfError } from "@/tcf/channel";
+import { DisassemblyService } from "@/tcf/services/disassembly";
+import { DisassemblyLine } from "@/tcf/services/disassembly";
 
 test("TCF disassembly requests opcode bytes in the requested context", async () => {
     const lines: DisassemblyLine[] = [{ Address: 0x123456789abcdef0n, Size: 1, Instruction: [{ Text: "ret" }] }];

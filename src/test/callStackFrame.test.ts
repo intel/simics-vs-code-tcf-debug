@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseCallStackContext } from "../callStackFrame";
+import { parseCallStackContext } from "@/callStackFrame";
 
 test("parseCallStackContext reads the thread and frame index", () => {
     assert.deepEqual(

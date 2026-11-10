@@ -1,4 +1,4 @@
-import { TcfChannel } from "../channel";
+import { TcfChannel } from "@/tcf/channel";
 
 /** Memory map region properties, see TCF Services -> Memory Map. */
 export interface MemoryRegionProperties {

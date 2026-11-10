@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
-import * as req from "../tcfRequests";
-import { MemoryAccessMode, type ByteRange } from "../tcf/services/memory";
+import * as req from "@/tcfRequests";
+import { MemoryAccessMode, type ByteRange } from "@/tcf/services/memory";
 
 export interface ReadResult {
     bytes: Uint8Array;

@@ -1,7 +1,7 @@
 import * as React from "react";
-import type { BytesPerRow, Endianness, GroupSize } from "../../../shared/targetMemory/format";
-import { BYTES_PER_ROW_OPTIONS, GROUP_SIZES } from "../../../shared/targetMemory/format";
-import type { MemoryTarget, PanelSettings, TargetState } from "../../../shared/targetMemory/protocol";
+import type { BytesPerRow, Endianness, GroupSize } from "@/shared/targetMemory/format";
+import { BYTES_PER_ROW_OPTIONS, GROUP_SIZES } from "@/shared/targetMemory/format";
+import type { MemoryTarget, PanelSettings, TargetState } from "@/shared/targetMemory/protocol";
 import { IconButton, Segmented } from "./controls";
 
 interface ToolbarProps {

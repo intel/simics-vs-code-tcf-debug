@@ -10,8 +10,8 @@ import {
     hexString,
     setNibble,
     type Endianness,
-} from "../../../shared/targetMemory/format";
-import { ByteState, type MemoryCache } from "../memoryCache";
+} from "@/shared/targetMemory/format";
+import { ByteState, type MemoryCache } from "@/webview/targetMemory/memoryCache";
 
 export const ROW_HEIGHT = 20;
 /**

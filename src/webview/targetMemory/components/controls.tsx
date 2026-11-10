@@ -1,4 +1,4 @@
-import { formatAddress, inspectBytes, type Endianness } from "../../../shared/targetMemory/format";
+import { formatAddress, inspectBytes, type Endianness } from "@/shared/targetMemory/format";
 
 export function Segmented<T extends string | number>(props: {
     value: T;

@@ -5,6 +5,9 @@
         "lib": ["ES2022"],
         "outDir": "out",
         "rootDir": "src",
+        "paths": {
+            "@/*": ["./src/*"]
+        },
         "strict": true,
         "noImplicitOverride": true,
         "noUnusedLocals": true,

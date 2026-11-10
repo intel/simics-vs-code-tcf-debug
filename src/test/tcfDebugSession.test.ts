@@ -1,10 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { TcfDebugSession, formatRegisterValue, selectStepMode } from "../tcfDebugSession";
-import { ResumeMode } from "../tcf/services/runControl";
+import { TcfDebugSession, formatRegisterValue, selectStepMode } from "@/tcfDebugSession";
+import { ResumeMode } from "@/tcf/services/runControl";
 import type { DebugProtocol } from "@vscode/debugprotocol";
-import type { LineNumbersService } from "../tcf/services/lineNumbers";
-import { PathMapper } from "../pathMapper";
+import type { LineNumbersService } from "@/tcf/services/lineNumbers";
+import { PathMapper } from "@/pathMapper";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";

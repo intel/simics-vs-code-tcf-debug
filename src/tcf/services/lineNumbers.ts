@@ -1,4 +1,4 @@
-import { TcfChannel } from "../channel";
+import { TcfChannel } from "@/tcf/channel";
 
 /** A code area, see TCF Services -> Line Numbers. */
 export interface CodeArea {

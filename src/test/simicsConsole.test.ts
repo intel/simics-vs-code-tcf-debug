@@ -14,8 +14,8 @@ import {
     isEmptySession,
     simicsCliOptions,
     trimHistory,
-} from "../simicsConsole";
-import { TcfError } from "../tcf/channel";
+} from "@/simicsConsole";
+import { TcfError } from "@/tcf/channel";
 
 const SHIFT = 1;
 const CTRL = 2;

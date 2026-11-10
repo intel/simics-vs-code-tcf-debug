@@ -6,7 +6,7 @@ import {
     formatGroup,
     asciiChar,
     hexString,
-} from "../../shared/targetMemory/format";
+} from "@/shared/targetMemory/format";
 import {
     DEFAULT_SETTINGS,
     type ContextMenuCommand,
@@ -15,7 +15,7 @@ import {
     type PanelSettings,
     type TargetState,
     type ToWebview,
-} from "../../shared/targetMemory/protocol";
+} from "@/shared/targetMemory/protocol";
 import { MemoryCache } from "./memoryCache";
 import { onMessage, post } from "./vscode";
 import { GridHeader, MemoryGrid, selectionRange, type GridHandle, type Selection } from "./components/MemoryGrid";

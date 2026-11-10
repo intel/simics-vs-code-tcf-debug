@@ -1,4 +1,4 @@
-import type { FromWebview, ToWebview } from "../../shared/targetMemory/protocol";
+import type { FromWebview, ToWebview } from "@/shared/targetMemory/protocol";
 
 interface VsCodeApi {
     postMessage(message: unknown): void;

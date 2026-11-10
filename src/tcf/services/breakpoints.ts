@@ -1,4 +1,4 @@
-import { TcfChannel } from "../channel";
+import { TcfChannel } from "@/tcf/channel";
 
 /** Breakpoint properties, see TCF Services -> Breakpoints -> set. */
 export interface BreakpointProperties {

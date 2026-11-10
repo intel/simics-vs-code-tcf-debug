@@ -1,8 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as net from "net";
-import { MessageReader, TcfChannel, TraceMessage, encodeMessage, formatTcfError, stringifyJson } from "../tcf/channel";
-import { parseJson, toBigInt } from "../tcf/json";
+import { MessageReader, TcfChannel, TraceMessage, encodeMessage, formatTcfError, stringifyJson } from "@/tcf/channel";
+import { parseJson, toBigInt } from "@/tcf/json";
 
 const ESC = 3;
 

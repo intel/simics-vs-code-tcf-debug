@@ -1,5 +1,5 @@
-import type { LaunchConfiguration } from "../launchJson";
-import type { JsonPath, StateMessage, WebviewMessage } from "../protocol";
+import type { LaunchConfiguration } from "@/launchSettings/launchJson";
+import type { JsonPath, StateMessage, WebviewMessage } from "@/launchSettings/protocol";
 import {
     agentAddress,
     editList,
@@ -10,7 +10,7 @@ import {
     parseInput,
     toggleChoice,
     valueAtPath,
-} from "../schema";
+} from "@/launchSettings/schema";
 
 /*
  * The launch configurations form: configuration names on the left, the attributes

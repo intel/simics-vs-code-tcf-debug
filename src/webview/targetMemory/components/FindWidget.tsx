@@ -5,16 +5,16 @@ import {
     hexString,
     parseAddress,
     type Endianness,
-} from "../../../shared/targetMemory/format";
+} from "@/shared/targetMemory/format";
 import {
     INT_SIZES,
     encodeNeedle,
     type EncodeResult,
     type FindFormat,
     type IntSize,
-} from "../../../shared/targetMemory/needle";
-import { DEFAULT_SETTINGS, type FindSettings } from "../../../shared/targetMemory/protocol";
-import type { SearchDirection } from "../../../shared/targetMemory/search";
+} from "@/shared/targetMemory/needle";
+import { DEFAULT_SETTINGS, type FindSettings } from "@/shared/targetMemory/protocol";
+import type { SearchDirection } from "@/shared/targetMemory/search";
 import { IconButton, Segmented } from "./controls";
 
 export type FindStatus =

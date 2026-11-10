@@ -1,4 +1,4 @@
-import { TcfChannel, formatTcfError } from "../channel";
+import { TcfChannel, formatTcfError } from "@/tcf/channel";
 
 /** Type classes, see TCF Services -> Symbols -> TypeClass. */
 export const enum TypeClass {

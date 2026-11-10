@@ -1,5 +1,5 @@
-import { TcfChannel, TcfError, formatTcfError } from "../channel";
-import { toBigInt } from "../json";
+import { TcfChannel, TcfError, formatTcfError } from "@/tcf/channel";
+import { toBigInt } from "@/tcf/json";
 
 /** Memory context properties, see TCF Services -> Memory. */
 export interface MemoryContext {

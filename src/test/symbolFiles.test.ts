@@ -9,8 +9,8 @@ import {
     describeForeignSymbolFile,
     formatSymbolFileAddress,
     parseSymbolFilesConfig,
-} from "../symbolFiles";
-import { MemoryMapService, MemoryRegionProperties } from "../tcf/services/memoryMap";
+} from "@/symbolFiles";
+import { MemoryMapService, MemoryRegionProperties } from "@/tcf/services/memoryMap";
 
 // No setting gives no files and no errors. A setting that is not a list
 // is an error.

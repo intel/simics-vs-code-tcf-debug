@@ -1,15 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { BreakpointHost, BreakpointManager, parseHitCondition } from "../breakpointManager";
-import { instructionReference } from "../disassembly";
-import { formatFunctionBreakpointName, parseFunctionBreakpointName } from "../functionBreakpoint";
-import { PathMapper } from "../pathMapper";
+import { BreakpointHost, BreakpointManager, parseHitCondition } from "@/breakpointManager";
+import { instructionReference } from "@/disassembly";
+import { formatFunctionBreakpointName, parseFunctionBreakpointName } from "@/functionBreakpoint";
+import { PathMapper } from "@/pathMapper";
 import {
     BreakpointCapabilities,
     BreakpointProperties,
     BreakpointStatus,
     BreakpointsService,
-} from "../tcf/services/breakpoints";
+} from "@/tcf/services/breakpoints";
 
 // TCF ignores the first IgnoreCount hits, so "N" means ignore N-1 hits.
 // Zero and extra spaces are allowed.

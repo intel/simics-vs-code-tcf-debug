@@ -1,11 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fc from "fast-check";
-import { MessageReader, encodeMessage, stringifyJson } from "../tcf/channel";
-import { parseJson, toBigInt } from "../tcf/json";
-import { MAX_ADDRESS } from "../shared/targetMemory/format";
-import { encodeNeedle, MAX_NEEDLE_LENGTH } from "../shared/targetMemory/needle";
-import { scanMemory } from "../shared/targetMemory/search";
+import { MessageReader, encodeMessage, stringifyJson } from "@/tcf/channel";
+import { parseJson, toBigInt } from "@/tcf/json";
+import { MAX_ADDRESS } from "@/shared/targetMemory/format";
+import { encodeNeedle, MAX_NEEDLE_LENGTH } from "@/shared/targetMemory/needle";
+import { scanMemory } from "@/shared/targetMemory/search";
 
 const options = { numRuns: 1000 };
 const endianness = fc.constantFrom("little", "big");

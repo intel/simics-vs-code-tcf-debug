@@ -1,4 +1,4 @@
-import { TcfChannel, TcfError, formatTcfError } from "../channel";
+import { TcfChannel, TcfError, formatTcfError } from "@/tcf/channel";
 import { CodeArea } from "./lineNumbers";
 
 /** Stack frame context properties, see TCF Services -> Stack Trace. */

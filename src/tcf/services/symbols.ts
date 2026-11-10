@@ -1,4 +1,4 @@
-import { TcfChannel } from "../channel";
+import { TcfChannel } from "@/tcf/channel";
 
 /** Symbol classes, see TCF Services -> Symbols -> SymbolClass. */
 export const enum SymbolClass {

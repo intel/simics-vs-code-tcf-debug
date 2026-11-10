@@ -1,14 +1,14 @@
 import * as vscode from "vscode";
 import type { DebugProtocol } from "@vscode/debugprotocol";
-import * as req from "../tcfRequests";
-import { BYTES_PER_ROW_OPTIONS, GROUP_SIZES, addressFromValue, parseAddress } from "../shared/targetMemory/format";
-import { INT_SIZES } from "../shared/targetMemory/needle";
+import * as req from "@/tcfRequests";
+import { BYTES_PER_ROW_OPTIONS, GROUP_SIZES, addressFromValue, parseAddress } from "@/shared/targetMemory/format";
+import { INT_SIZES } from "@/shared/targetMemory/needle";
 import {
     DEFAULT_SETTINGS,
     type ContextMenuCommand,
     type PanelSettings,
     type PhysicalContext,
-} from "../shared/targetMemory/protocol";
+} from "@/shared/targetMemory/protocol";
 import { TargetMemoryClient } from "./memoryClient";
 import { TargetMemoryPanel, errorText } from "./targetMemoryPanel";
 

@@ -8,17 +8,17 @@ import {
     inspectBytes,
     parseAddress,
     setNibble,
-} from "../shared/targetMemory/format";
-import { encodeNeedle } from "../shared/targetMemory/needle";
+} from "@/shared/targetMemory/format";
+import { encodeNeedle } from "@/shared/targetMemory/needle";
 import {
     findInChunk,
     planChunks,
     scanMemory,
     type ScanRead,
     type SearchDirection,
-} from "../shared/targetMemory/search";
-import { ByteState, MemoryCache } from "../webview/targetMemory/memoryCache";
-import type { FromWebview } from "../shared/targetMemory/protocol";
+} from "@/shared/targetMemory/search";
+import { ByteState, MemoryCache } from "@/webview/targetMemory/memoryCache";
+import type { FromWebview } from "@/shared/targetMemory/protocol";
 
 const bytes = (...b: number[]) => Uint8Array.from(b);
 

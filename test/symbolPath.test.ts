@@ -3,7 +3,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { test } from "node:test";
-import { suggestSymbolPaths } from "../src/symbolPath";
+import { suggestSymbolPaths } from "@/symbolPath";
 
 test("suggests workspace-relative and absolute symbol paths", async () => {
     const workspace = await fs.mkdtemp(path.join(os.tmpdir(), "tcf-symbol-path-"));

@@ -10,8 +10,8 @@ import {
     parsePathMapConfig,
     pathMapProblems,
     pathMapContextQuery,
-} from "../pathMapper";
-import { PathMapRuleProperties, PathMapService } from "../tcf/services/pathMap";
+} from "@/pathMapper";
+import { PathMapRuleProperties, PathMapService } from "@/tcf/services/pathMap";
 
 function fakePathMapService(agentRules: PathMapRuleProperties[] | Error) {
     const sets: PathMapRuleProperties[][] = [];

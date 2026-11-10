@@ -2,6 +2,9 @@ name: Copilot Code Review
 
 on: workflow_dispatch
 
+permissions:
+    contents: read
+
 jobs:
     copilot-setup-steps:
         runs-on: intel-ubuntu-latest

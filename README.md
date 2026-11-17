@@ -25,7 +25,7 @@ and translates DAP requests to TCF commands:
 | VS Code (DAP)            | TCF                                                        |
 |--------------------------|------------------------------------------------------------|
 | attach                   | TCP connection + `Locator.Hello`                           |
-| threads                  | `RunControl` contexts with `HasState`                      |
+| threads                  | `RunControl` contexts with `HasState`, grouped in a session per container context, see below |
 | pause / continue         | `RunControl.suspend` / `RunControl.resume`                 |
 | step over / into / out   | `RunControl.resume` with a step mode, see below            |
 | stopped / continued      | `contextSuspended`, `containerSuspended`, `contextResumed`, `containerResumed` events |
@@ -65,6 +65,81 @@ Values are read when the thread is suspended and are refreshed after each
 resume or step.
 
 ### Call stack
+
+The Call Stack view shows the parts of the target that can run and be
+stopped: processors and, with OS awareness, the processes and threads of the
+operating system. They are shown as a tree that follows the structure of the
+target. Parts with several threads, such as a board with several CPUs, an OS
+awareness tracker or a multi-threaded process, are shown as groups that can
+be expanded. Expand a thread to see its call stack.
+
+To keep the tree short:
+
+- Only parts with at least two threads get a group. A part with a single
+  thread, such as most Linux processes, gets no group: its thread is listed
+  in the group above.
+- A thread listed in a group above is named by the parts in between, so
+  thread `worker` of process `p3` is listed as `p3.worker`. A repeated name,
+  such as process `init` with thread `init`, is shown once.
+- If a group would hold only one thread next to other groups, that thread
+  gets a row of its own, with its call stack right below it.
+
+In a group, the threads are listed first, then the single threads with rows
+of their own, then the other groups, each in the order of the target.
+
+For example, take this target with a Linux OS awareness tracker, with
+simplified names:
+
+```text
+Linux
+├── Kernel
+│   ├── Other ── core[0][0]
+│   ├── Idle ──┬── core[0][0]
+│   │          └── core[1][0]
+│   └── Threads ──┬── kthreadd
+│                 └── kworker/0:0
+└── Userspace ──┬── init ── init
+                ├── rc ── rc
+                └── udevd ── udevd
+```
+
+The Call Stack view shows it like this:
+
+```text
+Linux                      group, in the row of the debug configuration
+├── Kernel                 group
+│   ├── Other.core[0][0]   single thread with a row of its own
+│   ├── Idle               group
+│   │   ├── core[0][0]     thread
+│   │   └── core[1][0]     thread
+│   └── Threads            group
+│       ├── kthreadd       thread
+│       └── kworker/0:0    thread
+└── Userspace              group
+    ├── init               thread
+    ├── rc                 thread
+    └── udevd              thread
+```
+
+`Other` and the processes in `Userspace` have a single thread each, so they
+get no group. The thread of `Other` is next to the groups `Idle` and
+`Threads`, so it gets a row of its own.
+
+Groups come and go as processes and threads start and end. All groups share
+the breakpoints and the Debug Console. Stopping or restarting any of them
+stops or restarts the whole debug session.
+
+Two options change the layout. You find them under **Advanced** in the
+launch configurations editor:
+
+- `"callStackHierarchy": false` shows no groups. All threads are listed
+  directly under the debug configuration, named by all the parts above them,
+  like `board.cpu0`. In the example, the threads are named
+  `Linux.Kernel.Idle.core[0][0]`, `Linux.Userspace.init.init` and so on.
+- `"callStackCompact": false` gives every group a row of its own. By default,
+  a group that is alone in its parent shares the parent's row and shows its
+  own name only, like `Linux` in the example. With `false`, the name of the
+  debug configuration gets a row of its own above `Linux`.
 
 The call stack of a suspended thread comes from the `StackTrace` service. VS
 Code first loads the top frame and then the rest in pages ("Load More Stack
@@ -392,6 +467,8 @@ Configuration attributes:
 | `traceTcf`                   | `false`     | Log TCF messages to Output › Simics Target Debug     |
 | `traceTcfSilence`            | see below   | TCF messages left out of the `traceTcf` log          |
 | `disassemblyFunctionHeaders` | `true`      | Function header rows in the Disassembly view         |
+| `callStackHierarchy`         | `true`      | A nested session per container context in the Call Stack view |
+| `callStackCompact`           | `true`      | Contexts that are the only child share a row with their parent |
 
 ### TCF trace
 
@@ -448,8 +525,8 @@ buttons in the editor title switch between the form and the text of
 - The fields come from `configurationAttributes` in `package.json`, so new
   attributes appear without changes to the form. Of VS Code's own options
   only `internalConsoleOptions` (when to open the Debug Console) is shown,
-  under **Advanced** at the end, with `connectTimeout`,
-  `disassemblyFunctionHeaders`, `traceTcf` and `traceTcfSilence`. The Simics console options
+  under **Advanced** at the end, with `connectTimeout`, `callStackHierarchy`,
+  `callStackCompact`, `disassemblyFunctionHeaders`, `traceTcf` and `traceTcfSilence`. The Simics console options
   and **Stay in Console** are under **Console**, just before **Advanced**.
   Others, like
   `preLaunchTask`, are listed under **Other Attributes** when set, and can be
@@ -660,6 +737,11 @@ on the agent (for example with `add-pathmap-entry`).
   debug type.
 - `src/tcfDebugSession.ts` – DAP implementation (no `vscode` dependency, so it
   can also be run as a standalone debug adapter later).
+- `src/contextSession.ts` – adapter of the child sessions that show the
+  threads of a container context; passes requests on to the root session's
+  adapter.
+- `src/contextSessionManager.ts` – starts the child sessions in VS Code and
+  maps them to their root session for the extension's views and commands.
 - `src/breakpointManager.ts` – keeps the agent's breakpoint table in sync with
   VS Code.
 - `src/variables.ts` – local variables and expressions through the

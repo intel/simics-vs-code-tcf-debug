@@ -34,10 +34,10 @@ export class TargetMemoryClient {
         return result.suspended;
     }
 
+    /** The full name of a thread's context, like the physical memory contexts. */
     async threadName(threadId: number): Promise<string | undefined> {
-        const result = (await this.session.customRequest("threads")) as
-            { threads?: { id: number; name: string }[] } | undefined;
-        return result?.threads?.find((t) => t.id === threadId)?.name;
+        const args: req.ThreadContextArgs = { threadId };
+        return (await this.request<req.ThreadContextResult>(req.TcfRequest.ThreadContext, args)).name;
     }
 
     /** Physical memory contexts with their full names. */

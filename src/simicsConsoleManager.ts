@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { ConsoleEntry, ConsoleSource } from "./consolesView";
+import { activeRootSession, isContextSession } from "./contextSessionManager";
 import { applyAndSave } from "./launchSettings/editorProvider";
 import { readConfigurations, setNamedConfigurationValue } from "./launchSettings/launchJson";
 import {
@@ -107,7 +108,7 @@ export class SimicsConsoleManager implements ConsoleSource, vscode.Disposable {
             vscode.window.onDidCloseTerminal((t) => this.terminalClosed(t)),
             vscode.window.onDidChangeActiveTerminal(() => this.updateEditingKeys()),
             vscode.debug.onDidStartDebugSession((s) => {
-                if (s.type === debugType) {
+                if (s.type === debugType && !isContextSession(s)) {
                     this.sessions.add(s.id);
                 }
             }),
@@ -182,7 +183,7 @@ export class SimicsConsoleManager implements ConsoleSource, vscode.Disposable {
 
     /** "Open Simics Console": for the active session. */
     open(): void {
-        const session = vscode.debug.activeDebugSession;
+        const session = activeRootSession();
         if (session?.type !== this.debugType) {
             void vscode.window.showErrorMessage(NO_SESSION);
             return;

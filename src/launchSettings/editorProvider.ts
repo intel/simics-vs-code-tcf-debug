@@ -13,6 +13,7 @@ import {
     removeConfigurations,
     setValue,
 } from "./launchJson";
+import { isContextSession } from "@/contextSessionManager";
 import { SettingValue, StateMessage, WebviewMessage } from "./protocol";
 import { Field, agentAddress, fieldPath, launchFields, launchTemplate, valueAtPath } from "./schema";
 
@@ -62,7 +63,7 @@ export function registerLaunchSettings(context: vscode.ExtensionContext): void {
         vscode.commands.registerCommand("simics-target-debug.openLaunchSettings", openLaunchSettings),
         vscode.commands.registerCommand("simics-target-debug.openLaunchJson", openLaunchJson),
         vscode.debug.onDidStartDebugSession((session) => {
-            if (session.type === DEBUG_TYPE) {
+            if (session.type === DEBUG_TYPE && !isContextSession(session)) {
                 tcfSessions.add(session);
                 debuggingChanged.fire();
             }

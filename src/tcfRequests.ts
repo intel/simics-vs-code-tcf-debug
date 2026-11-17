@@ -27,6 +27,8 @@ export interface ThreadContextArgs {
 
 export interface ThreadContextResult {
     contextId: string;
+    /** Full name, made from the names of the context and its ancestors. */
+    name?: string;
 }
 
 export interface ContextSuspendedArgs {

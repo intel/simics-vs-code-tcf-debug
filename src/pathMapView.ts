@@ -1,5 +1,6 @@
 import * as path from "path";
 import * as vscode from "vscode";
+import { activeRootSession } from "./contextSessionManager";
 import { savePathMapRules, withWorkspaceFolder } from "./locateSource";
 import { PathMapRule, pathMapContextQuery } from "./pathMapper";
 import { promptPathMapScope } from "./pathMapScope";
@@ -41,13 +42,13 @@ class PathMapProvider implements vscode.TreeDataProvider<vscode.TreeItem>, vscod
     }
 
     async getChildren(): Promise<vscode.TreeItem[]> {
-        const session = vscode.debug.activeDebugSession;
+        const session = activeRootSession();
         if (session?.type !== DEBUG_TYPE) {
             return [];
         }
         try {
             const rules = await getRules(session);
-            if (session !== vscode.debug.activeDebugSession) {
+            if (session !== activeRootSession()) {
                 return [];
             }
             return rules.length
@@ -68,7 +69,7 @@ export function registerPathMapView(context: vscode.ExtensionContext): void {
     const command = (name: string, action: (session: vscode.DebugSession, item?: PathMapItem) => Promise<void>) =>
         vscode.commands.registerCommand(`simics-target-debug.${name}`, async (item?: PathMapItem) => {
             try {
-                const session = vscode.debug.activeDebugSession;
+                const session = activeRootSession();
                 if (session?.type !== DEBUG_TYPE || (item && item.session !== session)) {
                     throw new Error("Select an active Simics Target Debug session.");
                 }
@@ -121,7 +122,7 @@ async function setRules(
     rules: PathMapRule[],
     expectedRules: PathMapRule[],
 ): Promise<void> {
-    if (vscode.debug.activeDebugSession !== session) {
+    if (activeRootSession() !== session) {
         throw new Error("The active debug session changed. Please retry.");
     }
     await session.customRequest("setPathMapRules", { rules, expectedRules });

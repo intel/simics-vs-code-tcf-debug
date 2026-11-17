@@ -119,7 +119,15 @@ const GROUPS: { group: FieldGroup; keys: string[]; labels?: Record<string, strin
     },
     {
         group: "advanced",
-        keys: ["connectTimeout", "disassemblyFunctionHeaders", "internalConsoleOptions", "traceTcf", "traceTcfSilence"],
+        keys: [
+            "connectTimeout",
+            "callStackHierarchy",
+            "callStackCompact",
+            "disassemblyFunctionHeaders",
+            "internalConsoleOptions",
+            "traceTcf",
+            "traceTcfSilence",
+        ],
     },
 ];
 

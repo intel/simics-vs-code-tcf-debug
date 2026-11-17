@@ -917,6 +917,16 @@
                                 "type": "boolean",
                                 "description": "Show a header row with source file, line and name above the first instruction of each function in the Disassembly view. Needs the agent's Symbols service and the setting debug.disassemblyView.showSourceCode. Turn off to save the symbol lookups.",
                                 "default": true
+                            },
+                            "callStackHierarchy": {
+                                "type": "boolean",
+                                "description": "Show the run control context hierarchy in the Call Stack view: each context with child contexts and two or more threads (for example a multi-threaded process of an OS awareness tracker) becomes a nested session that holds its threads. Turn off to list all threads directly under the debug session, with their full names.",
+                                "default": true
+                            },
+                            "callStackCompact": {
+                                "type": "boolean",
+                                "description": "With callStackHierarchy, let VS Code show a context in one row with its parent when it is the parent's only child. The row shows the name of the innermost context only. Turn off to give every context a row of its own, below a row for the debug session.",
+                                "default": true
                             }
                         }
                     }

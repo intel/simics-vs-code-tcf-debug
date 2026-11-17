@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import type { DebugProtocol } from "@vscode/debugprotocol";
+import { activeRootSession, isContextSession, rootSession } from "@/contextSessionManager";
 import * as req from "@/tcfRequests";
 import { BYTES_PER_ROW_OPTIONS, GROUP_SIZES, addressFromValue, parseAddress } from "@/shared/targetMemory/format";
 import { INT_SIZES } from "@/shared/targetMemory/needle";
@@ -79,7 +80,8 @@ export class TargetMemoryManager implements vscode.Disposable {
             vscode.debug.onDidStartDebugSession((s) => this.addSession(s)),
             vscode.debug.onDidTerminateDebugSession((s) => this.removeSession(s)),
             vscode.debug.onDidChangeActiveDebugSession((s) => {
-                const info = s && this.sessions.get(s.id);
+                const root = rootSession(s);
+                const info = root && this.sessions.get(root.id);
                 if (info && info !== this.current) {
                     this.current = info;
                     this.updatePanels();
@@ -101,7 +103,7 @@ export class TargetMemoryManager implements vscode.Disposable {
             menuCommand("find", "find"),
             menuCommand("refresh", "refresh"),
         );
-        const active = vscode.debug.activeDebugSession;
+        const active = activeRootSession();
         if (active) {
             this.addSession(active);
             this.onActiveStackItem(vscode.debug.activeStackItem);
@@ -251,7 +253,9 @@ export class TargetMemoryManager implements vscode.Disposable {
 
     private frameId(info: SessionInfo): number | undefined {
         const item = vscode.debug.activeStackItem;
-        return item instanceof vscode.DebugStackFrame && item.session.id === info.session.id ? item.frameId : undefined;
+        return item instanceof vscode.DebugStackFrame && rootSession(item.session) === info.session
+            ? item.frameId
+            : undefined;
     }
 
     private async loadPhysicalContexts(info: SessionInfo): Promise<PhysicalContext[]> {
@@ -265,7 +269,7 @@ export class TargetMemoryManager implements vscode.Disposable {
     }
 
     private addSession(session: vscode.DebugSession): void {
-        if (session.type !== this.debugType || this.sessions.has(session.id)) {
+        if (session.type !== this.debugType || isContextSession(session) || this.sessions.has(session.id)) {
             return;
         }
         const info: SessionInfo = {
@@ -274,7 +278,7 @@ export class TargetMemoryManager implements vscode.Disposable {
             running: false,
         };
         this.sessions.set(session.id, info);
-        if (!this.current || vscode.debug.activeDebugSession === session) {
+        if (!this.current || activeRootSession() === session) {
             this.current = info;
             this.updatePanels();
         }
@@ -287,15 +291,16 @@ export class TargetMemoryManager implements vscode.Disposable {
         }
         this.sessions.delete(session.id);
         if (this.current === info) {
-            const active = vscode.debug.activeDebugSession;
+            const active = activeRootSession();
             this.current = (active && this.sessions.get(active.id)) ?? [...this.sessions.values()].pop();
             this.updatePanels();
         }
     }
 
     private onActiveStackItem(item: vscode.DebugThread | vscode.DebugStackFrame | undefined): void {
-        const info = item && this.sessions.get(item.session.id);
-        if (!info || info.focusedThread === item.threadId) {
+        const root = item && rootSession(item.session);
+        const info = root && this.sessions.get(root.id);
+        if (!item || !info || info.focusedThread === item.threadId) {
             return;
         }
         info.focusedThread = item.threadId;
@@ -305,7 +310,9 @@ export class TargetMemoryManager implements vscode.Disposable {
     }
 
     private onAdapterMessage(session: vscode.DebugSession, m: DebugProtocol.ProtocolMessage): void {
-        const info = this.sessions.get(session.id);
+        // Context sessions report the stops of their threads, which belong to the root session.
+        const root = rootSession(session);
+        const info = root && this.sessions.get(root.id);
         if (m.type !== "event" || !info) {
             return;
         }
@@ -313,6 +320,9 @@ export class TargetMemoryManager implements vscode.Disposable {
         const isCurrent = info === this.current;
         switch (e.event) {
             case "initialized":
+                if (root !== session) {
+                    break;
+                }
                 // Attached: the agent's memory contexts can be listed now.
                 info.physical = undefined;
                 if (isCurrent) {

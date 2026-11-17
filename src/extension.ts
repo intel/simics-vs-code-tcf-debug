@@ -28,6 +28,12 @@ import { suggestSymbolPaths } from "./symbolPath";
 import { registerConsolesView } from "./consolesView";
 import { CONSOLE_AVAILABLE_EVENT, simicsCliOptions } from "./simicsConsole";
 import { SimicsConsoleManager } from "./simicsConsoleManager";
+import {
+    ContextSessionManager,
+    activeRootSession,
+    isContextSession,
+    isContextSessionConfig,
+} from "./contextSessionManager";
 import { TcfDebugSession, TcfLog } from "./tcfDebugSession";
 import { TargetMemoryManager } from "./targetMemory/targetMemoryManager";
 
@@ -42,6 +48,7 @@ export function activate(context: vscode.ExtensionContext): void {
     const sessions = new Map<string, vscode.DebugSession>();
     const sourceLocator = new SourceLocator();
     const adapters = new Map<string, TcfDebugSession>();
+    const contextSessions = new ContextSessionManager(DEBUG_TYPE, tcfLog);
     const consoles = new SimicsConsoleManager(
         DEBUG_TYPE,
         (session) => adapters.get(session.id)?.tcfChannel,
@@ -49,11 +56,17 @@ export function activate(context: vscode.ExtensionContext): void {
     );
     context.subscriptions.push(
         tcfLog,
+        contextSessions,
         vscode.debug.registerDebugConfigurationProvider(DEBUG_TYPE, new TcfConfigurationProvider()),
         vscode.debug.registerDebugAdapterDescriptorFactory(DEBUG_TYPE, {
             createDebugAdapterDescriptor: (session) => {
+                const contextAdapter = contextSessions.createContextAdapter(session);
+                if (contextAdapter) {
+                    return new vscode.DebugAdapterInlineImplementation(contextAdapter);
+                }
                 const adapter = new TcfDebugSession(sessionLog(tcfLog, session.name), hasBreakpoint);
                 adapters.set(session.id, adapter);
+                contextSessions.addRoot(session, adapter);
                 return new vscode.DebugAdapterInlineImplementation(adapter);
             },
         }),
@@ -61,13 +74,17 @@ export function activate(context: vscode.ExtensionContext): void {
         registerFunctionHeaderFileSystem(),
         vscode.debug.onDidStartDebugSession((session) => {
             sessions.set(session.id, session);
-            symbolFiles.refresh();
+            if (!isContextSession(session)) {
+                symbolFiles.refresh();
+            }
         }),
         vscode.debug.onDidTerminateDebugSession((session) => {
             sessions.delete(session.id);
             adapters.delete(session.id);
             terminatedSessions.add(session);
-            symbolFiles.refresh();
+            if (!isContextSession(session)) {
+                symbolFiles.refresh();
+            }
         }),
         vscode.debug.onDidChangeActiveDebugSession(() => symbolFiles.refresh()),
         vscode.debug.onDidReceiveDebugSessionCustomEvent((event) => {
@@ -90,7 +107,7 @@ export function activate(context: vscode.ExtensionContext): void {
         consoles,
         vscode.commands.registerCommand("simics-target-debug.openConsole", () => consoles.open()),
         vscode.commands.registerCommand("simics-target-debug.locateSourceFile", () => {
-            const session = vscode.debug.activeDebugSession;
+            const session = activeRootSession();
             return sourceLocator.locateCommand(session?.type === DEBUG_TYPE ? session : undefined);
         }),
         // Invoked from the Call Stack view context menu: the source URI, then
@@ -383,7 +400,7 @@ async function editFunctionBreakpointContexts(): Promise<void> {
 }
 
 async function addSymbolFile(symbolFiles: SymbolFilesProvider): Promise<void> {
-    const session = vscode.debug.activeDebugSession;
+    const session = activeRootSession();
     if (session?.type !== DEBUG_TYPE) {
         void vscode.window.showErrorMessage("Start a Simics Target Debug session before adding a symbol file.");
         return;
@@ -609,7 +626,7 @@ async function updateSymbolFilePath(
 }
 
 async function editSymbolFile(item?: SymbolFileViewItem): Promise<void> {
-    if (!item || vscode.debug.activeDebugSession !== item.session) {
+    if (!item || activeRootSession() !== item.session) {
         void vscode.window.showErrorMessage("Select a symbol file in the active TCF session to edit its mapping.");
         return;
     }
@@ -674,7 +691,7 @@ async function editSymbolFile(item?: SymbolFileViewItem): Promise<void> {
     ) {
         return;
     }
-    if (vscode.debug.activeDebugSession !== session) {
+    if (activeRootSession() !== session) {
         return;
     }
     await replaceSymbolFile(session, index, file, updated);
@@ -844,7 +861,7 @@ async function promptSymbolContext(session: vscode.DebugSession, initialContext 
 
 async function saveSymbolFiles(): Promise<void> {
     try {
-        const session = vscode.debug.activeDebugSession;
+        const session = activeRootSession();
         if (session?.type !== DEBUG_TYPE) {
             throw new Error("Select an active Simics Target Debug session.");
         }
@@ -867,7 +884,7 @@ async function saveSymbolFiles(): Promise<void> {
         if (choice !== "Save") {
             return;
         }
-        if (vscode.debug.activeDebugSession !== session) {
+        if (activeRootSession() !== session) {
             throw new Error("The active debug session changed. Please retry.");
         }
         const document = await vscode.workspace.openTextDocument(
@@ -884,7 +901,7 @@ async function saveSymbolFiles(): Promise<void> {
 }
 
 async function changeSymbolFiles(command: string, item?: SymbolFileViewItem): Promise<void> {
-    const session = vscode.debug.activeDebugSession;
+    const session = activeRootSession();
     if (session?.type !== DEBUG_TYPE || (item && item.session !== session)) {
         void vscode.window.showErrorMessage("Select an active TCF session and refresh the Symbol Files view.");
         return;
@@ -969,7 +986,7 @@ class SymbolFilesProvider implements vscode.TreeDataProvider<vscode.TreeItem>, v
         if (element instanceof ForeignSymbolFilesItem) {
             return element.children;
         }
-        const session = vscode.debug.activeDebugSession;
+        const session = activeRootSession();
         if (session?.type !== DEBUG_TYPE) {
             return [];
         }
@@ -981,7 +998,7 @@ class SymbolFilesProvider implements vscode.TreeDataProvider<vscode.TreeItem>, v
                 }>,
                 foreignSymbolFileItems(session),
             ]);
-            if (vscode.debug.activeDebugSession !== session) {
+            if (activeRootSession() !== session) {
                 return [];
             }
             if (!result.supported) {
@@ -1029,6 +1046,9 @@ class TcfConfigurationProvider implements vscode.DebugConfigurationProvider {
         folder: vscode.WorkspaceFolder | undefined,
         config: vscode.DebugConfiguration,
     ): Promise<vscode.DebugConfiguration | undefined> {
+        if (isContextSessionConfig(config)) {
+            return config;
+        }
         const problems = pathMapProblems(config.pathMap, (p) => fs.existsSync(p), folder?.uri.fsPath);
         if (problems.length > 0) {
             const answer = await vscode.window.showWarningMessage(

@@ -72,6 +72,84 @@ export interface TcfAttachArguments extends DebugProtocol.AttachRequestArguments
     pathMap?: PathMapRule[];
     /** Symbol files to add to the agent's memory map. */
     symbolFiles?: SymbolFileConfig[];
+    /** Show the threads of container contexts in child sessions, see ContextSessionHost. */
+    callStackHierarchy?: boolean;
+    /** Let VS Code merge a child session's row with its parent's, read by the extension. */
+    callStackCompact?: boolean;
+}
+
+/**
+ * A run control context with child contexts, shown as a child debug session
+ * of the session of its nearest container ancestor.
+ */
+export interface ContextGroup {
+    /** Unique, also across adapters, and never reused. */
+    key: string;
+    name: string;
+    /** The group whose session is the parent, undefined for the root session. */
+    parentKey?: string;
+}
+
+/**
+ * Starts and ends the child debug sessions of container contexts, so that
+ * the Call Stack view shows the context hierarchy instead of a flat list of
+ * threads. Groups are added parents first. The child sessions connect to
+ * the root adapter with connectContextSession.
+ */
+export interface ContextSessionHost {
+    groupAdded(group: ContextGroup): void;
+    groupRenamed(key: string, name: string): void;
+    groupRemoved(key: string): void;
+}
+
+/** The adapter of a child session, as seen from the root adapter. */
+export interface ContextSessionSink {
+    sendEvent(event: DebugProtocol.Event): void;
+    /** The group is gone or the root session ended. */
+    terminate(): void;
+}
+
+/** A child session's connection to the root adapter. */
+export interface ContextSessionLink {
+    threads(): DebugProtocol.Thread[];
+    /** VS Code has configured the child session: report its suspended threads. */
+    configured(): void;
+    /** Handles a request in the root adapter, with its IDs for threads, frames and variables. */
+    forward(request: DebugProtocol.Request): Promise<DebugProtocol.Response>;
+    disconnect(): void;
+}
+
+/** The capabilities of the root and child sessions. */
+export const TCF_CAPABILITIES: DebugProtocol.Capabilities = {
+    supportsConfigurationDoneRequest: true,
+    supportsDelayedStackTraceLoading: true,
+    supportsEvaluateForHovers: true,
+    supportsSteppingGranularity: true,
+    supportsDisassembleRequest: true,
+    supportsConditionalBreakpoints: true,
+    supportsHitConditionalBreakpoints: true,
+    supportsLogPoints: true,
+    supportsFunctionBreakpoints: true,
+    supportsDataBreakpoints: true,
+    supportsDataBreakpointBytes: true,
+    supportsInstructionBreakpoints: true,
+    exceptionBreakpointFilters: [],
+    supportsTerminateRequest: false,
+    supportsRestartRequest: false,
+};
+
+/** The group key of the root session's threads. */
+const ROOT_GROUP = "";
+
+let nextGroupKey = 1;
+
+interface GroupState extends ContextGroup {
+    contextId: string;
+    sink?: ContextSessionSink;
+    /** Events are sent once VS Code has configured the child session. */
+    configured: boolean;
+    /** VS Code shows the session as paused although it has no threads, see updateSessionStates. */
+    pausedShown: boolean;
 }
 
 /** Where the TCF trace goes instead of the Debug Console, for example an Output channel. */
@@ -190,6 +268,20 @@ export class TcfDebugSession extends DebugSession {
     private readonly ctxByThreadId = new Map<number, string>();
     private nextThreadId = 1;
     private readonly threadStates = new Map<string, ThreadState>();
+    private contextSessionHost: ContextSessionHost | undefined;
+    /** Container contexts shown as child sessions, by key, parents first. */
+    private readonly groups = new Map<string, GroupState>();
+    private readonly groupKeyByCtx = new Map<string, string>();
+    /** The group whose session shows a thread, ROOT_GROUP for this session. */
+    private readonly threadGroups = new Map<string, string>();
+    private groupsAnnounced = false;
+    /** Like GroupState.pausedShown, for this session. */
+    private rootPausedShown = false;
+    /** The thread that caused the last stop, which VS Code focuses. */
+    private focusThread: string | undefined;
+    /** Requests forwarded from child sessions, by their (negative) sequence number. */
+    private readonly forwardedRequests = new Map<number, (response: DebugProtocol.Response) => void>();
+    private nextForwardedSeq = -1;
     /** Contexts with a step in progress, used to report the stop reason. */
     private readonly pendingSteps = new Set<string>();
     private readonly frameCache = new Map<string, Promise<FrameInfo>>();
@@ -235,25 +327,51 @@ export class TcfDebugSession extends DebugSession {
         return this.channel;
     }
 
-    protected override initializeRequest(response: DebugProtocol.InitializeResponse): void {
-        response.body = {
-            ...response.body,
-            supportsConfigurationDoneRequest: true,
-            supportsDelayedStackTraceLoading: true,
-            supportsEvaluateForHovers: true,
-            supportsSteppingGranularity: true,
-            supportsDisassembleRequest: true,
-            supportsConditionalBreakpoints: true,
-            supportsHitConditionalBreakpoints: true,
-            supportsLogPoints: true,
-            supportsFunctionBreakpoints: true,
-            supportsDataBreakpoints: true,
-            supportsDataBreakpointBytes: true,
-            supportsInstructionBreakpoints: true,
-            exceptionBreakpointFilters: [],
-            supportsTerminateRequest: false,
-            supportsRestartRequest: false,
+    /**
+     * Shows the threads of container contexts in child sessions started by
+     * `host`, unless the configuration turns it off. Call before attaching.
+     */
+    setContextSessionHost(host: ContextSessionHost): void {
+        this.contextSessionHost = host;
+    }
+
+    /** Connects a child session's adapter, undefined if its group is gone. */
+    connectContextSession(key: string, sink: ContextSessionSink): ContextSessionLink | undefined {
+        const group = this.groups.get(key);
+        if (!group || group.sink) {
+            return undefined;
+        }
+        group.sink = sink;
+        return {
+            threads: () => this.groupThreads(key),
+            configured: () => {
+                if (this.groups.get(key)?.sink === sink) {
+                    group.configured = true;
+                    this.reportGroupState(key);
+                }
+            },
+            forward: (request) => this.forwardRequest(request),
+            disconnect: () => {
+                if (group.sink === sink) {
+                    group.sink = undefined;
+                    group.configured = false;
+                }
+            },
         };
+    }
+
+    override sendResponse(response: DebugProtocol.Response): void {
+        const forwarded = this.forwardedRequests.get(response.request_seq);
+        if (forwarded) {
+            this.forwardedRequests.delete(response.request_seq);
+            forwarded(response);
+            return;
+        }
+        super.sendResponse(response);
+    }
+
+    protected override initializeRequest(response: DebugProtocol.InitializeResponse): void {
+        response.body = { ...response.body, ...TCF_CAPABILITIES };
         this.sendResponse(response);
     }
 
@@ -262,6 +380,9 @@ export class TcfDebugSession extends DebugSession {
         args: TcfAttachArguments,
     ): Promise<void> {
         this.disassemblyFunctionHeaders = args.disassemblyFunctionHeaders !== false;
+        if (args.callStackHierarchy === false) {
+            this.contextSessionHost = undefined;
+        }
         const host = args.host ?? "localhost";
         const port = args.port ?? 1534;
         const tcfLog = this.tcfLog;
@@ -317,9 +438,9 @@ export class TcfDebugSession extends DebugSession {
                     contextChanged: () => {
                         this.regContextCache.clear();
                         this.regChildrenCache.clear();
-                        this.sendEvent(new InvalidatedEvent(["variables"]));
+                        this.sendInvalidated(["variables"]);
                     },
-                    registerChanged: () => this.sendEvent(new InvalidatedEvent(["variables"])),
+                    registerChanged: () => this.sendInvalidated(["variables"]),
                 });
             } else {
                 this.log(
@@ -753,7 +874,7 @@ export class TcfDebugSession extends DebugSession {
                 // Files may have been added or removed by someone else.
                 this.sendEvent(new Event("symbolFilesChanged"));
                 if (this.configured && [...this.threadStates.values()].some((s) => s.suspended)) {
-                    this.sendEvent(new InvalidatedEvent(["stacks", "variables"]));
+                    this.sendInvalidated(["stacks", "variables"]);
                 }
             }, 100);
         }
@@ -764,6 +885,7 @@ export class TcfDebugSession extends DebugSession {
     ): Promise<void> {
         this.sendResponse(response);
         this.configured = true;
+        this.announceGroups();
         await this.reportInitialState();
     }
 
@@ -771,18 +893,14 @@ export class TcfDebugSession extends DebugSession {
         this.disconnecting = true;
         clearTimeout(this.symbolsChangedTimer);
         this.channel?.close();
+        for (const key of [...this.groups.keys()]) {
+            this.removeGroup(key);
+        }
         this.sendResponse(response);
     }
 
     protected override threadsRequest(response: DebugProtocol.ThreadsResponse): void {
-        const threads: Thread[] = [];
-        for (const id of this.contextOrder) {
-            const threadId = this.threadIdByCtx.get(id);
-            if (threadId !== undefined) {
-                threads.push(new Thread(threadId, this.contextDisplayName(id)));
-            }
-        }
-        response.body = { threads };
+        response.body = { threads: this.groupThreads(ROOT_GROUP) };
         this.sendResponse(response);
     }
 
@@ -1094,7 +1212,11 @@ export class TcfDebugSession extends DebugSession {
             case req.TcfRequest.ThreadContext:
                 await handle(async () => {
                     const { threadId } = args as req.ThreadContextArgs;
-                    response.body = { contextId: this.requireThreadCtx(threadId) } satisfies req.ThreadContextResult;
+                    const contextId = this.requireThreadCtx(threadId);
+                    response.body = {
+                        contextId,
+                        name: this.contextDisplayName(contextId),
+                    } satisfies req.ThreadContextResult;
                 });
                 return true;
             case req.TcfRequest.ContextSuspended:
@@ -1535,7 +1657,7 @@ export class TcfDebugSession extends DebugSession {
         this.sendEvent(new Event("pathMapChanged"));
         const suspended = [...this.threadStates.values()].some((s) => s.suspended);
         if (this.configured && suspended) {
-            this.sendEvent(new InvalidatedEvent(["stacks"]));
+            this.sendInvalidated(["stacks"]);
         }
         await this.breakpoints?.updateSourcePaths();
     }
@@ -1794,11 +1916,13 @@ export class TcfDebugSession extends DebugSession {
         };
         const ordered = await visit(null);
         for (const id of ordered) {
-            this.addContext(this.contexts.get(id)!, false);
+            this.addContext(this.contexts.get(id)!);
         }
+        this.updateGroups();
     }
 
-    private addContext(ctx: RunControlContext, notify: boolean): void {
+    /** Adds or updates a context. Call updateGroups after a batch, it reports new threads. */
+    private addContext(ctx: RunControlContext): void {
         const isNew = !this.contextOrder.includes(ctx.ID);
         this.contexts.set(ctx.ID, ctx);
         if (isNew) {
@@ -1808,9 +1932,6 @@ export class TcfDebugSession extends DebugSession {
             const threadId = this.nextThreadId++;
             this.threadIdByCtx.set(ctx.ID, threadId);
             this.ctxByThreadId.set(threadId, ctx.ID);
-            if (notify) {
-                this.sendEvent(new ThreadEvent("started", threadId));
-            }
         }
     }
 
@@ -1857,8 +1978,10 @@ export class TcfDebugSession extends DebugSession {
         if (threadId !== undefined) {
             this.threadIdByCtx.delete(id);
             this.ctxByThreadId.delete(threadId);
-            if (this.configured) {
-                this.sendEvent(new ThreadEvent("exited", threadId));
+            const group = this.threadGroups.get(id);
+            this.threadGroups.delete(id);
+            if (group !== undefined) {
+                this.sendToGroup(group, new ThreadEvent("exited", threadId));
             }
         }
     }
@@ -1866,16 +1989,19 @@ export class TcfDebugSession extends DebugSession {
     private addRunControlListener(rc: RunControlService): void {
         rc.addListener({
             contextAdded: (ctxs) => {
-                ctxs.forEach((c) => this.addContext(c, this.configured));
+                ctxs.forEach((c) => this.addContext(c));
+                this.updateGroups();
                 this.pathMapContextsChanged();
                 void this.breakpoints?.updateInstructionScopes();
             },
             contextChanged: (ctxs) => {
-                ctxs.forEach((c) => this.addContext(c, this.configured));
+                ctxs.forEach((c) => this.addContext(c));
+                this.updateGroups();
                 this.pathMapContextsChanged();
             },
             contextRemoved: (ids) => {
                 ids.forEach((id) => this.removeContext(id));
+                this.updateGroups();
                 this.pathMapContextsChanged();
                 void this.breakpoints?.updateInstructionScopes();
             },
@@ -1905,13 +2031,17 @@ export class TcfDebugSession extends DebugSession {
         if (pc !== undefined) {
             this.knownInstructionStarts.add(triggerId, pc);
         }
+        // The reason is the trigger's. Without a thread as trigger, the first suspended thread is reported as such.
+        const reasonCtx = this.threadIdByCtx.has(triggerId) ? triggerId : ids.find((id) => this.threadIdByCtx.has(id));
         for (const id of ids) {
             // Only the trigger context's PC is reported, fetch others lazily.
-            this.threadStates.set(id, { suspended: true, pc: id === triggerId ? pc : undefined, reason });
+            this.threadStates.set(id, {
+                suspended: true,
+                pc: id === triggerId ? pc : undefined,
+                reason: id === reasonCtx ? reason : undefined,
+            });
         }
-        if (!this.threadStates.has(triggerId)) {
-            this.threadStates.set(triggerId, { suspended: true, pc, reason });
-        }
+        this.threadStates.set(triggerId, { suspended: true, pc, reason });
         if (!this.configured) {
             return;
         }
@@ -1977,45 +2107,76 @@ export class TcfDebugSession extends DebugSession {
         if (!this.configured) {
             return;
         }
-        const threadIds = ids.map((id) => this.threadIdByCtx.get(id)).filter((t): t is number => t !== undefined);
-        if (threadIds.length === 0) {
-            return;
-        }
-        if (this.allThreads((s) => !s.suspended)) {
-            this.sendEvent(new ContinuedEvent(threadIds[0], true));
-        } else {
-            for (const t of threadIds) {
-                this.sendEvent(new ContinuedEvent(t, false));
+        for (const [group, ctxIds] of this.threadsByGroup(ids)) {
+            if (this.allGroupThreads(group, (s) => !s.suspended)) {
+                this.sendToGroup(group, new ContinuedEvent(this.threadIdByCtx.get(ctxIds[0])!, true));
+                this.setPausedShown(group, false);
+            } else {
+                for (const id of ctxIds) {
+                    this.sendToGroup(group, new ContinuedEvent(this.threadIdByCtx.get(id)!, false));
+                }
             }
         }
+        this.updateSessionStates();
     }
 
-    private reportStopped(triggerId: string, ids: string[], stop: StopInfo): void {
-        const triggerThread =
-            this.threadIdByCtx.get(triggerId) ??
-            ids.map((id) => this.threadIdByCtx.get(id)).find((t) => t !== undefined);
-        if (triggerThread === undefined) {
+    /**
+     * Reports stopped threads to the sessions that show them. The trigger
+     * thread gets `stop`, the others the reason in their state, which is
+     * only set if it is their own (from getState). Only the trigger may take
+     * the focus, if `focus` is set.
+     */
+    private reportStopped(triggerId: string, ids: string[], stop: StopInfo, focus = true): void {
+        const triggerCtx = this.threadIdByCtx.has(triggerId) ? triggerId : ids.find((id) => this.threadIdByCtx.has(id));
+        if (triggerCtx === undefined) {
             return;
         }
-        if (this.allThreads((s) => s.suspended)) {
-            this.sendEvent(stoppedEvent(stop, triggerThread, true));
-            return;
+        if (focus) {
+            this.focusThread = triggerCtx;
         }
-        this.sendEvent(stoppedEvent(stop, triggerThread, false));
-        // Breakpoint hits only apply to the context that hit them.
-        const others: StopInfo = { reason: stop.reason, stepped: stop.stepped };
-        for (const id of ids) {
-            const t = this.threadIdByCtx.get(id);
-            if (t !== undefined && t !== triggerThread) {
-                const e = stoppedEvent(others, t, false);
-                e.body.preserveFocusHint = true;
-                this.sendEvent(e);
+        const triggerGroup = this.groupOfThread(triggerCtx);
+        for (const [group, ctxIds] of this.threadsByGroup([triggerCtx, ...ids])) {
+            const event = (id: string, allThreadsStopped: boolean) => {
+                // Breakpoint hits only apply to the context that hit them.
+                const info = id === triggerCtx ? stop : { reason: this.threadStates.get(id)?.reason };
+                const e = stoppedEvent(info, this.threadIdByCtx.get(id)!, allThreadsStopped);
+                if (!focus || id !== triggerCtx || group !== triggerGroup) {
+                    e.body.preserveFocusHint = true;
+                }
+                return e;
+            };
+            if (this.allGroupThreads(group, (s) => s.suspended)) {
+                // VS Code shows the other threads as "Paused", only those
+                // with a reason of their own need an event.
+                this.sendToGroup(group, event(ctxIds[0], true));
+                for (const id of ctxIds.slice(1)) {
+                    if (ownStopReason(this.threadStates.get(id)?.reason)) {
+                        this.sendToGroup(group, event(id, false));
+                    }
+                }
+            } else {
+                for (const id of ctxIds) {
+                    this.sendToGroup(group, event(id, false));
+                }
             }
         }
+        this.updateSessionStates();
     }
 
-    private allThreads(pred: (s: ThreadState) => boolean): boolean {
+    /** The thread to report first among suspended threads: the focused one, else one with a reason of its own. */
+    private reportedTrigger(suspended: string[]): string | undefined {
+        if (this.focusThread !== undefined && suspended.includes(this.focusThread)) {
+            return this.focusThread;
+        }
+        return suspended.find((id) => ownStopReason(this.threadStates.get(id)?.reason)) ?? suspended[0];
+    }
+
+    /** Whether `pred` holds for all threads shown in a group's session. */
+    private allGroupThreads(group: string, pred: (s: ThreadState) => boolean): boolean {
         for (const id of this.threadIdByCtx.keys()) {
+            if (this.groupOfThread(id) !== group) {
+                continue;
+            }
             const s = this.threadStates.get(id);
             if (!s || !pred(s)) {
                 return false;
@@ -2046,8 +2207,9 @@ export class TcfDebugSession extends DebugSession {
                 );
             }
         });
-        if (suspended.length > 0) {
-            this.reportStopped(suspended[0], suspended, { reason: this.threadStates.get(suspended[0])?.reason });
+        const trigger = this.reportedTrigger(suspended);
+        if (trigger !== undefined) {
+            this.reportStopped(trigger, suspended, { reason: this.threadStates.get(trigger)?.reason });
         }
     }
 
@@ -2082,6 +2244,359 @@ export class TcfDebugSession extends DebugSession {
             names.unshift(c.Name ?? c.ID);
         }
         return names.length > 0 ? names.join(".") : id;
+    }
+
+    // ---- Context sessions --------------------------------------------------
+
+    private groupOfThread(id: string): string {
+        return this.threadGroups.get(id) ?? ROOT_GROUP;
+    }
+
+    /** The threads among `ids` by the group that shows them, in order and without duplicates. */
+    private threadsByGroup(ids: string[]): Map<string, string[]> {
+        const result = new Map<string, string[]>();
+        for (const id of new Set(ids)) {
+            if (this.threadIdByCtx.has(id)) {
+                const group = this.groupOfThread(id);
+                const list = result.get(group);
+                if (list) {
+                    list.push(id);
+                } else {
+                    result.set(group, [id]);
+                }
+            }
+        }
+        return result;
+    }
+
+    private sendToGroup(group: string, event: DebugProtocol.Event): void {
+        if (group === ROOT_GROUP) {
+            if (this.configured) {
+                this.sendEvent(event);
+            }
+            return;
+        }
+        const g = this.groups.get(group);
+        if (g?.configured) {
+            g.sink?.sendEvent(event);
+        }
+    }
+
+    /** Child sessions cache frames and variables too. */
+    private sendInvalidated(areas: DebugProtocol.InvalidatedAreas[]): void {
+        this.sendEvent(new InvalidatedEvent(areas));
+        for (const g of this.groups.values()) {
+            if (g.configured) {
+                g.sink?.sendEvent(new InvalidatedEvent(areas));
+            }
+        }
+    }
+
+    private groupThreads(group: string): DebugProtocol.Thread[] {
+        const threads: DebugProtocol.Thread[] = [];
+        for (const id of this.contextOrder) {
+            const threadId = this.threadIdByCtx.get(id);
+            if (threadId !== undefined && this.groupOfThread(id) === group) {
+                const name = this.contextSessionHost ? this.groupThreadName(id, group) : this.contextDisplayName(id);
+                threads.push(new Thread(threadId, name));
+            }
+        }
+        return threads;
+    }
+
+    /**
+     * The name of a thread in its group's session: the names of the
+     * contexts below the group's context, since the sessions above show the
+     * rest. A container with a single thread has no session of its own, and
+     * often has the thread's name, so repeated names are shown once.
+     */
+    private groupThreadName(id: string, group: string): string {
+        return this.relativeName(id, group === ROOT_GROUP ? undefined : this.groups.get(group)?.contextId);
+    }
+
+    /** The names of a context and its ancestors below `top`, repeated names once. */
+    private relativeName(id: string, top: string | undefined): string {
+        const names: string[] = [];
+        for (let c = this.contexts.get(id); c && c.ID !== top && names.length <= this.contexts.size;) {
+            const name = c.Name ?? c.ID;
+            if (names[0] !== name) {
+                names.unshift(name);
+            }
+            c = c.ParentID ? this.contexts.get(c.ParentID) : undefined;
+        }
+        return names.length > 0 ? names.join(".") : (this.contexts.get(id)?.Name ?? id);
+    }
+
+    /**
+     * Brings the groups in line with the context tree and moves threads to
+     * the session of their nearest container, reporting new threads. A
+     * session cannot move, so a group whose parent group changes is replaced.
+     */
+    private updateGroups(): void {
+        const containers = this.contextSessionHost ? this.groupContexts() : [];
+        const wanted = new Set(containers.map((c) => c.id));
+        for (const g of [...this.groups.values()]) {
+            if (!wanted.has(g.contextId)) {
+                this.removeGroup(g.key);
+            }
+        }
+        for (const { id, name } of containers) {
+            const parentKey = this.parentGroupKey(id);
+            const key = this.groupKeyByCtx.get(id);
+            let group = key === undefined ? undefined : this.groups.get(key);
+            if (group && group.parentKey !== parentKey) {
+                this.removeGroup(group.key);
+                group = undefined;
+            }
+            if (!group) {
+                group = {
+                    key: String(nextGroupKey++),
+                    name,
+                    parentKey,
+                    contextId: id,
+                    configured: false,
+                    pausedShown: false,
+                };
+                this.groups.set(group.key, group);
+                this.groupKeyByCtx.set(id, group.key);
+                if (this.groupsAnnounced) {
+                    this.contextSessionHost!.groupAdded({ key: group.key, name, parentKey });
+                }
+            } else if (group.name !== name) {
+                group.name = name;
+                if (this.groupsAnnounced) {
+                    this.contextSessionHost!.groupRenamed(group.key, name);
+                }
+            }
+        }
+        const moved: string[] = [];
+        for (const [id, threadId] of this.threadIdByCtx) {
+            const group = this.groupKeyByCtx.get(id) ?? this.parentGroupKey(id) ?? ROOT_GROUP;
+            const old = this.threadGroups.get(id);
+            if (old === group) {
+                continue;
+            }
+            this.threadGroups.set(id, group);
+            if (old !== undefined) {
+                this.sendToGroup(old, new ThreadEvent("exited", threadId));
+            }
+            this.sendToGroup(group, new ThreadEvent("started", threadId));
+            if (this.threadStates.get(id)?.suspended) {
+                moved.push(id);
+            }
+        }
+        // A new thread in VS Code is running until reported stopped.
+        const trigger = this.reportedTrigger(moved);
+        if (trigger !== undefined) {
+            const focus = trigger === this.focusThread;
+            this.reportStopped(trigger, moved, { reason: this.threadStates.get(trigger)?.reason }, focus);
+        }
+        this.updateSessionStates();
+    }
+
+    /**
+     * The contexts that get a session, parents first, with the session names.
+     *
+     * VS Code shows a session with a single thread without the thread row,
+     * so only contexts with children and at least two threads among them,
+     * below them or themselves get a session. The thread of a container with
+     * a single thread is shown in the session above instead. If that leaves
+     * a session with a single thread next to child sessions, the thread would
+     * be hidden, so it gets a session of its own, named like the thread.
+     */
+    private groupContexts(): { id: string; name: string }[] {
+        const children = new Map<string, string[]>();
+        for (const id of this.contextOrder) {
+            const parent = this.contexts.get(id)?.ParentID;
+            if (parent !== undefined && this.contexts.has(parent)) {
+                children.set(parent, [...(children.get(parent) ?? []), id]);
+            }
+        }
+        const threadCounts = new Map<string, number>();
+        const threadCount = (id: string): number => {
+            let result = threadCounts.get(id);
+            if (result === undefined) {
+                threadCounts.set(id, 0);
+                result =
+                    (this.contexts.get(id)?.HasState === true ? 1 : 0) + sum((children.get(id) ?? []).map(threadCount));
+                threadCounts.set(id, result);
+            }
+            return result;
+        };
+        const containers = this.contextOrder.filter((id) => children.has(id) && threadCount(id) >= 2);
+        const isContainer = new Set(containers);
+        // The session of a context: its nearest container, undefined for this session.
+        const sessionOf = (id: string): string | undefined => {
+            const seen = new Set<string>();
+            for (let p = this.contexts.get(id)?.ParentID; p !== undefined && !seen.has(p);) {
+                seen.add(p);
+                if (isContainer.has(p)) {
+                    return p;
+                }
+                p = this.contexts.get(p)?.ParentID;
+            }
+            return undefined;
+        };
+        const ownThreads = new Map<string | undefined, string[]>();
+        for (const id of this.threadIdByCtx.keys()) {
+            const session = isContainer.has(id) ? id : sessionOf(id);
+            ownThreads.set(session, [...(ownThreads.get(session) ?? []), id]);
+        }
+        const hasChildSessions = new Set(containers.map(sessionOf));
+        const groups = containers.map((id) => ({ id, name: this.contexts.get(id)?.Name ?? id, parent: sessionOf(id) }));
+        for (const [session, threads] of ownThreads) {
+            if (threads.length === 1 && threads[0] !== session && hasChildSessions.has(session)) {
+                groups.push({ id: threads[0], name: this.relativeName(threads[0], session), parent: session });
+            }
+        }
+        // VS Code lists child sessions in the order they start: parents
+        // first, then sessions of threads (for example CPUs) before the
+        // others, else in the order of the context tree.
+        const sessionDepth = (id: string | undefined): number => {
+            let d = 0;
+            for (let p = id; p !== undefined && d < groups.length; d++) {
+                p = groups.find((g) => g.id === p)?.parent;
+            }
+            return d;
+        };
+        const order = new Map(this.contextOrder.map((id, i) => [id, i]));
+        return groups
+            .map((g) => ({
+                ...g,
+                depth: sessionDepth(g.parent),
+                threadsLast: this.contexts.get(g.id)?.HasState === true ? 0 : 1,
+            }))
+            .sort((a, b) => a.depth - b.depth || a.threadsLast - b.threadsLast || order.get(a.id)! - order.get(b.id)!)
+            .map(({ id, name }) => ({ id, name }));
+    }
+
+    /** The key of the nearest ancestor's group. */
+    private parentGroupKey(id: string): string | undefined {
+        const seen = new Set<string>();
+        for (let p = this.contexts.get(id)?.ParentID; p !== undefined && !seen.has(p);) {
+            seen.add(p);
+            const key = this.groupKeyByCtx.get(p);
+            if (key !== undefined) {
+                return key;
+            }
+            p = this.contexts.get(p)?.ParentID;
+        }
+        return undefined;
+    }
+
+    /** Removes a group and ends its session. Its threads move with the next updateGroups. */
+    private removeGroup(key: string): void {
+        const group = this.groups.get(key);
+        if (!group) {
+            return;
+        }
+        this.groups.delete(key);
+        if (this.groupKeyByCtx.get(group.contextId) === key) {
+            this.groupKeyByCtx.delete(group.contextId);
+        }
+        for (const [id, g] of this.threadGroups) {
+            if (g === key) {
+                // Reported as started in its new session only.
+                this.threadGroups.delete(id);
+            }
+        }
+        const sink = group.sink;
+        group.sink = undefined;
+        group.configured = false;
+        sink?.terminate();
+        if (this.groupsAnnounced) {
+            this.contextSessionHost?.groupRemoved(key);
+        }
+    }
+
+    /** Lets the host start the child sessions, once this session is configured. */
+    private announceGroups(): void {
+        if (!this.contextSessionHost || this.groupsAnnounced) {
+            return;
+        }
+        this.groupsAnnounced = true;
+        for (const g of this.groups.values()) {
+            this.contextSessionHost.groupAdded({ key: g.key, name: g.name, parentKey: g.parentKey });
+        }
+    }
+
+    /** Reports the suspended threads of a child session that VS Code has just configured. */
+    private reportGroupState(key: string): void {
+        const suspended = [...this.threadIdByCtx.keys()].filter(
+            (id) => this.groupOfThread(id) === key && this.threadStates.get(id)?.suspended,
+        );
+        const trigger = this.reportedTrigger(suspended);
+        if (trigger !== undefined) {
+            const focus = trigger === this.focusThread;
+            this.reportStopped(trigger, suspended, { reason: this.threadStates.get(trigger)?.reason }, focus);
+        }
+        this.updateSessionStates();
+    }
+
+    /**
+     * VS Code shows a session without threads as running. Such sessions are
+     * reported stopped, without a thread, while all threads below them are
+     * suspended, and continued otherwise.
+     */
+    private updateSessionStates(): void {
+        if (!this.contextSessionHost) {
+            return;
+        }
+        const own = new Set<string>();
+        const any = new Set<string>();
+        const running = new Set<string>();
+        for (const id of this.threadIdByCtx.keys()) {
+            const isRunning = !this.threadStates.get(id)?.suspended;
+            let key: string | undefined = this.groupOfThread(id);
+            own.add(key);
+            for (const seen = new Set<string>(); key !== undefined && !seen.has(key);) {
+                seen.add(key);
+                any.add(key);
+                if (isRunning) {
+                    running.add(key);
+                }
+                key = key === ROOT_GROUP ? undefined : (this.groups.get(key)?.parentKey ?? ROOT_GROUP);
+            }
+        }
+        for (const key of [ROOT_GROUP, ...this.groups.keys()]) {
+            const ready = key === ROOT_GROUP ? this.configured : this.groups.get(key)!.configured;
+            if (!ready || own.has(key)) {
+                continue;
+            }
+            const paused = any.has(key) && !running.has(key);
+            if (paused && !this.isPausedShown(key)) {
+                const e = new StoppedEvent("pause") as DebugProtocol.StoppedEvent;
+                e.body = { reason: "pause", description: "Paused", preserveFocusHint: true, allThreadsStopped: false };
+                this.sendToGroup(key, e);
+                this.setPausedShown(key, true);
+            } else if (!paused && this.isPausedShown(key)) {
+                this.sendToGroup(key, new ContinuedEvent(0, true));
+                this.setPausedShown(key, false);
+            }
+        }
+    }
+
+    private isPausedShown(key: string): boolean {
+        return key === ROOT_GROUP ? this.rootPausedShown : this.groups.get(key)?.pausedShown === true;
+    }
+
+    private setPausedShown(key: string, shown: boolean): void {
+        if (key === ROOT_GROUP) {
+            this.rootPausedShown = shown;
+        } else {
+            const g = this.groups.get(key);
+            if (g) {
+                g.pausedShown = shown;
+            }
+        }
+    }
+
+    private forwardRequest(request: DebugProtocol.Request): Promise<DebugProtocol.Response> {
+        return new Promise((resolve) => {
+            const seq = this.nextForwardedSeq--;
+            this.forwardedRequests.set(seq, resolve);
+            this.dispatchRequest({ ...request, seq });
+        });
     }
 
     // ---- Helpers ---------------------------------------------------------
@@ -2120,11 +2635,24 @@ function stoppedEvent(stop: StopInfo, threadId: number, allThreadsStopped: boole
     if (stop.hits && stop.hits.dapIds.length > 0) {
         e.body.hitBreakpointIds = stop.hits.dapIds;
     }
+    // Only the reason of the context itself is shown, "Paused" otherwise.
+    e.body.description = ownStopReason(tcfReason) ? tcfReason : reason === "step" ? "Step" : "Paused";
     if (tcfReason) {
-        e.body.description = tcfReason;
         e.body.text = tcfReason;
     }
     return e;
+}
+
+/**
+ * Whether a TCF suspend reason says why the context itself stopped, unlike
+ * "Suspended" and "Container", which contexts get when everything stops.
+ */
+function ownStopReason(reason: string | undefined): reason is string {
+    return reason !== undefined && reason !== "Suspended" && reason !== "Container";
+}
+
+function sum(values: number[]): number {
+    return values.reduce((a, b) => a + b, 0);
 }
 
 /**

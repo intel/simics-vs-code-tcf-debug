@@ -4,6 +4,15 @@ All notable changes to the Simics Target Debug extension will be documented here
 
 ## [Unreleased]
 
+### Added
+
+- The Call Stack view shows the run control context hierarchy: each context
+  with child contexts, such as a process of the Linux tracker, is a nested
+  session with its threads. Turn it off with `"callStackHierarchy": false`.
+  `"callStackCompact": false` gives every context a row of its own.
+  Containers with a single thread, such as most processes, show the thread in
+  the session above.
+
 ### Changed
 
 - In TCF Launch Configurations, the Start, Duplicate and Delete buttons

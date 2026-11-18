@@ -472,21 +472,24 @@ export type ConsoleState = "connecting" | "connected" | "disconnected";
 /** The parts of a TcfChannel the console uses. */
 export type ConsoleChannel = Pick<TcfChannel, "isOpen" | "hasService" | "command" | "onEvent" | "on" | "off">;
 
-/** Custom DAP event: the session's agent has a console. Its body is `{ open: boolean }`, whether to open it. */
+/** Custom DAP event: the session's agent has a console. */
 export const CONSOLE_AVAILABLE_EVENT = "consoleAvailable";
 
-/** The consoles.simicsCli launch attributes, with their defaults. */
+/** The simics-target-debug.console settings, with their defaults. */
 export interface SimicsCliOptions {
     open: boolean;
     historySessions: number;
     editingKeys: boolean;
 }
 
-export function simicsCliOptions(config: unknown): SimicsCliOptions {
-    const c = (config as { consoles?: { simicsCli?: Partial<Record<keyof SimicsCliOptions, unknown>> } } | undefined)
-        ?.consoles?.simicsCli;
-    const sessions = typeof c?.historySessions === "number" ? Math.floor(c.historySessions) : 3;
-    return { open: c?.open !== false, historySessions: Math.max(0, sessions), editingKeys: c?.editingKeys !== false };
+/** Checks the values of the settings, which settings.json may give any type. */
+export function simicsCliOptions(values: Partial<Record<keyof SimicsCliOptions, unknown>>): SimicsCliOptions {
+    const sessions = typeof values.historySessions === "number" ? Math.floor(values.historySessions) : 3;
+    return {
+        open: values.open !== false,
+        historySessions: Math.max(0, sessions),
+        editingKeys: values.editingKeys !== false,
+    };
 }
 
 /** Where the console's output goes, normally a Pseudoterminal. */

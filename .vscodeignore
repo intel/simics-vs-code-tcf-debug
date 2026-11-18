@@ -4,6 +4,7 @@
 !out/target-memory.css
 !out/webview/launchSettings.js
 !out/webview/launchSettings.css
+!out/webview/settings.js
 !package.json
 !README.md
 !CHANGELOG.md

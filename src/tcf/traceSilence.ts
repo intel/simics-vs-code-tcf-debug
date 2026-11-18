@@ -14,7 +14,7 @@ export interface TraceSilenceRule {
     name?: string;
 }
 
-/** Keep in sync with the default of "traceTcfSilence" in package.json. */
+/** Keep in sync with the default of "simics-target-debug.tcfTrace.silence" in package.json. */
 export const DEFAULT_TRACE_SILENCE: readonly TraceSilenceRule[] = [
     { service: "Locator", type: ["event"], name: "peerHeartBeat" },
     { service: "Locator", type: ["event"], name: "peerAdded" },
@@ -24,7 +24,8 @@ export const DEFAULT_TRACE_SILENCE: readonly TraceSilenceRule[] = [
 ];
 
 /**
- * The rules of a "traceTcfSilence" attribute: the defaults if it is not set.
+ * The rules of the traceTcfSilence attach argument, from the setting
+ * simics-target-debug.tcfTrace.silence: the defaults if it is not set.
  * `invalid` has the entries that are not rules.
  */
 export function parseTraceSilence(value: unknown): { rules: TraceSilenceRule[]; invalid: unknown[] } {

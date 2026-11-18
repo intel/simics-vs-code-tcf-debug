@@ -14,11 +14,12 @@ import {
     setValue,
 } from "./launchJson";
 import { isContextSession } from "@/contextSessionManager";
-import { SettingValue, StateMessage, WebviewMessage } from "./protocol";
+import { StateMessage, WebviewMessage } from "./protocol";
 import { Field, agentAddress, fieldPath, launchFields, launchTemplate, valueAtPath } from "./schema";
 
 /** Must match "customEditors" in package.json. */
 export const LAUNCH_SETTINGS_VIEW_TYPE = "simics-target-debug.launchSettings";
+const OPEN_SETTINGS = "simics-target-debug.openSettings";
 
 const NEW_LAUNCH_JSON = '{\n    "version": "0.2.0",\n    "configurations": []\n}\n';
 
@@ -31,22 +32,6 @@ const debuggingChanged = new vscode.EventEmitter<void>();
 function busyAgents(): string[] {
     const running = [...tcfSessions].map((s) => agentAddress(s.configuration));
     return [...new Set([...running, ...startingAgents])];
-}
-
-/** The values of the fields stored in VS Code settings, see Field.setting. */
-function settingValues(fields: Field[], uri: vscode.Uri): Record<string, SettingValue> {
-    const config = vscode.workspace.getConfiguration(undefined, uri);
-    const values: Record<string, SettingValue> = {};
-    for (const f of fields) {
-        if (f.setting) {
-            const value = config.get(f.setting.section);
-            values[f.key] = {
-                value: f.setting.invert && typeof value === "boolean" ? !value : value,
-                modified: config.inspect(f.setting.section)?.workspaceValue !== undefined,
-            };
-        }
-    }
-    return values;
 }
 
 export function registerLaunchSettings(context: vscode.ExtensionContext): void {
@@ -134,9 +119,7 @@ class LaunchSettingsEditorProvider implements vscode.CustomTextEditorProvider {
 
     resolveCustomTextEditor(document: vscode.TextDocument, panel: vscode.WebviewPanel): void {
         const webview = panel.webview;
-        const webviewDir = vscode.Uri.joinPath(this.extensionUri, "out", "webview");
-        webview.options = { enableScripts: true, localResourceRoots: [webviewDir] };
-        webview.html = this.html(webview, webviewDir);
+        setWebviewHtml(webview, this.extensionUri, "launchSettings.js", "TCF Launch Configurations");
 
         let select: number | undefined;
         let generation = 0;
@@ -152,7 +135,6 @@ class LaunchSettingsEditorProvider implements vscode.CustomTextEditorProvider {
                 select,
                 missingPaths: [],
                 busyAgents: busyAgents(),
-                settings: settingValues(this.fields, document.uri),
             };
             select = undefined;
             message.missingPaths = await missingPaths(
@@ -169,11 +151,6 @@ class LaunchSettingsEditorProvider implements vscode.CustomTextEditorProvider {
         let queue = Promise.resolve();
         const subscriptions = [
             debuggingChanged.event(() => void post()),
-            vscode.workspace.onDidChangeConfiguration((e) => {
-                if (this.fields.some((f) => f.setting && e.affectsConfiguration(f.setting.section))) {
-                    void post();
-                }
-            }),
             vscode.workspace.onDidChangeTextDocument((e) => {
                 if (e.document === document) {
                     void post();
@@ -215,18 +192,9 @@ class LaunchSettingsEditorProvider implements vscode.CustomTextEditorProvider {
             case "openText":
                 await vscode.commands.executeCommand("vscode.openWith", document.uri, "default");
                 return;
-            case "setSetting": {
-                const setting = this.fields.find((f) => f.key === message.key)?.setting;
-                if (!setting) {
-                    return;
-                }
-                const value = setting.invert && typeof message.value === "boolean" ? !message.value : message.value;
-                // Window settings such as debug.focusEditorOnBreak cannot be set per folder.
-                await vscode.workspace
-                    .getConfiguration(undefined, document.uri)
-                    .update(setting.section, value, vscode.ConfigurationTarget.Workspace);
+            case "openSettings":
+                await vscode.commands.executeCommand(OPEN_SETTINGS);
                 return;
-            }
             case "set":
             case "remove": {
                 const text = checkedText(document, message.index, message.name);
@@ -324,12 +292,16 @@ class LaunchSettingsEditorProvider implements vscode.CustomTextEditorProvider {
             }
         }
     }
+}
 
-    private html(webview: vscode.Webview, webviewDir: vscode.Uri): string {
-        const nonce = randomBytes(16).toString("base64");
-        const script = webview.asWebviewUri(vscode.Uri.joinPath(webviewDir, "launchSettings.js"));
-        const style = webview.asWebviewUri(vscode.Uri.joinPath(webviewDir, "launchSettings.css"));
-        return `<!DOCTYPE html>
+/** Loads `script`, a bundle in out/webview, with the stylesheet the forms share. */
+export function setWebviewHtml(webview: vscode.Webview, extensionUri: vscode.Uri, script: string, title: string): void {
+    const webviewDir = vscode.Uri.joinPath(extensionUri, "out", "webview");
+    webview.options = { enableScripts: true, localResourceRoots: [webviewDir] };
+    const nonce = randomBytes(16).toString("base64");
+    const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(webviewDir, script));
+    const style = webview.asWebviewUri(vscode.Uri.joinPath(webviewDir, "launchSettings.css"));
+    webview.html = `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -337,14 +309,13 @@ class LaunchSettingsEditorProvider implements vscode.CustomTextEditorProvider {
         content="default-src 'none'; style-src ${webview.cspSource}; font-src data:; script-src 'nonce-${nonce}';">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="${style}" rel="stylesheet">
-    <title>TCF Launch Configurations</title>
+    <title>${title}</title>
 </head>
 <body>
     <div id="app"></div>
-    <script nonce="${nonce}" src="${script}"></script>
+    <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;
-    }
 }
 
 /**

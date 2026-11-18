@@ -1,26 +1,25 @@
 import * as vscode from "vscode";
 import { ConsoleEntry, ConsoleSource } from "./consolesView";
 import { activeRootSession, isContextSession } from "./contextSessionManager";
-import { applyAndSave } from "./launchSettings/editorProvider";
-import { readConfigurations, setNamedConfigurationValue } from "./launchSettings/launchJson";
+import { SETTINGS, consoleSettings, updateSetting } from "./settings";
 import {
     ConsoleChannel,
     ConsoleSession,
     ConsoleState,
     SimicsConsole,
     isEmptySession,
-    simicsCliOptions,
     trimHistory,
 } from "./simicsConsole";
 
 const HAS_CONSOLES = "simics-target-debug.hasConsoles";
 /** Enables the package.json key bindings that send VS Code's keys to Simics. */
 const EDITING_KEYS = "simics-target-debug.editingKeys";
+const EDITING_KEYS_SETTING = `${SETTINGS}.console.editingKeys`;
 const HISTORY_KEY = "simics-target-debug.consoleHistory";
 const LABEL = "Simics CLI";
 const NO_SESSION =
     "Start a Simics Target Debug session first. The Simics console uses its connection to the TCF agent.";
-const OPEN_LAUNCH_SETTINGS = "simics-target-debug.openLaunchSettings";
+const OPEN_SETTINGS = "simics-target-debug.openSettings";
 
 const ICONS: Record<ConsoleState | "closed", string> = {
     connecting: "loading~spin",
@@ -76,7 +75,6 @@ interface Entry {
     key: string;
     session: vscode.DebugSession;
     options: HistoryOptions;
-    editingKeys: boolean;
     terminal?: vscode.Terminal;
     pty?: ConsoleTerminal;
 }
@@ -107,6 +105,11 @@ export class SimicsConsoleManager implements ConsoleSource, vscode.Disposable {
             this.changes,
             vscode.window.onDidCloseTerminal((t) => this.terminalClosed(t)),
             vscode.window.onDidChangeActiveTerminal(() => this.updateEditingKeys()),
+            vscode.workspace.onDidChangeConfiguration((e) => {
+                if (e.affectsConfiguration(EDITING_KEYS_SETTING)) {
+                    this.changed();
+                }
+            }),
             vscode.debug.onDidStartDebugSession((s) => {
                 if (s.type === debugType && !isContextSession(s)) {
                     this.sessions.add(s.id);
@@ -132,7 +135,7 @@ export class SimicsConsoleManager implements ConsoleSource, vscode.Disposable {
             void vscode.window.showErrorMessage(NO_SESSION);
             return;
         }
-        const options = historyOptions(session);
+        const options = historyOptions();
         if (options.keep && entry?.pty?.recorded) {
             // Its output is written again in the new terminal.
             entry.terminal?.dispose();
@@ -149,32 +152,21 @@ export class SimicsConsoleManager implements ConsoleSource, vscode.Disposable {
             location: vscode.TerminalLocation.Panel,
             iconPath: new vscode.ThemeIcon("terminal"),
         });
-        this.entries.set(key, {
-            key,
-            session,
-            options,
-            // A console opened again in the same session keeps the button's choice.
-            editingKeys:
-                entry?.session === session ? entry.editingKeys : simicsCliOptions(session.configuration).editingKeys,
-            terminal,
-            pty,
-        });
+        this.entries.set(key, { key, session, options, terminal, pty });
         terminal.show(preserveFocus);
         this.changed();
     }
 
     /** The agent of `session` has a console: opens it, or lists it as not open. */
-    available(session: vscode.DebugSession, open: boolean): void {
+    available(session: vscode.DebugSession): void {
         const key = agentKey(session);
         const entry = this.entries.get(key);
-        const editingKeys = simicsCliOptions(session.configuration).editingKeys;
         if (!entry) {
-            this.entries.set(key, { key, session, options: historyOptions(session), editingKeys });
+            this.entries.set(key, { key, session, options: historyOptions() });
         } else if (entry.session !== session) {
             entry.session = session;
-            entry.editingKeys = editingKeys;
         }
-        if (open) {
+        if (consoleSettings().open) {
             this.show(session, true);
         } else {
             this.changed();
@@ -193,11 +185,12 @@ export class SimicsConsoleManager implements ConsoleSource, vscode.Disposable {
 
     consoleEntries(): ConsoleEntry[] {
         const many = this.entries.size > 1;
+        const { open, editingKeys } = consoleSettings();
         return [...this.entries.values()].map((e) => {
             const state = e.terminal ? (e.pty?.console.state ?? "closed") : "closed";
             const live = state === "connecting" || state === "connected";
             const connectable = !live && this.connectable(e);
-            const keys = e.editingKeys ? "keysToSimics" : "keysToVsCode";
+            const keys = editingKeys ? "keysToSimics" : "keysToVsCode";
             const connect = connectable ? (state === "closed" ? "connect" : "reconnect") : "";
             const contextValue = [
                 "simicsCli",
@@ -211,34 +204,16 @@ export class SimicsConsoleManager implements ConsoleSource, vscode.Disposable {
                 id: `simics-cli:${e.key}`,
                 label: many ? `${LABEL} (${e.key})` : LABEL,
                 description: describe(state, connectable),
-                tooltip: tooltip(e, state, connectable),
+                tooltip: tooltip(e.key, state, connectable, open, editingKeys),
                 icon: ICONS[state],
                 iconColor: live ? undefined : "disabledForeground",
                 contextValue,
                 show: () => (connectable ? this.show(e.session, false) : e.terminal?.show(false)),
                 connect: () => this.show(e.session, false),
                 clearHistory: () => this.clearHistory(e.key),
-                setEditingKeys: (on: boolean) => this.setEditingKeys(e.key, on),
+                setEditingKeys,
             };
         });
-    }
-
-    /** Changes the console at once, and saves the choice in the session's configuration in launch.json. */
-    async setEditingKeys(key: string, on: boolean): Promise<void> {
-        const entry = this.entries.get(key);
-        if (!entry) {
-            return;
-        }
-        entry.editingKeys = on;
-        this.changed();
-        try {
-            await saveEditingKeys(entry.session, on);
-        } catch (err) {
-            void vscode.window.showWarningMessage(
-                "The editing keys changed for this console only. Could not save them to launch.json: " +
-                    (err instanceof Error ? err.message : String(err)),
-            );
-        }
     }
 
     /** Forgets the earlier sessions of the agent at `key`, and redraws its terminal. */
@@ -329,7 +304,7 @@ export class SimicsConsoleManager implements ConsoleSource, vscode.Disposable {
     private updateEditingKeys(): void {
         const active = vscode.window.activeTerminal;
         const entry = [...this.entries.values()].find((e) => e.terminal && e.terminal === active);
-        const on = !!entry?.editingKeys && !!entry.pty && entry.pty.console.state !== "disconnected";
+        const on = consoleSettings().editingKeys && !!entry?.pty && entry.pty.console.state !== "disconnected";
         void vscode.commands.executeCommand("setContext", EDITING_KEYS, on);
     }
 }
@@ -341,9 +316,21 @@ function agentKey(session: vscode.DebugSession): string {
     return `${host}:${port}`;
 }
 
-function historyOptions(session: vscode.DebugSession): HistoryOptions {
-    const { historySessions } = simicsCliOptions(session.configuration);
+function historyOptions(): HistoryOptions {
+    const { historySessions } = consoleSettings();
     return { keep: historySessions > 0, sessions: historySessions };
+}
+
+/** Switches the editing keys of all Simics consoles. */
+async function setEditingKeys(on: boolean): Promise<void> {
+    try {
+        await updateSetting(EDITING_KEYS_SETTING, on);
+    } catch (err) {
+        void vscode.window.showWarningMessage(
+            `Could not change the setting ${EDITING_KEYS_SETTING}: ` +
+                (err instanceof Error ? err.message : String(err)),
+        );
+    }
 }
 
 function describe(state: ConsoleState | "closed", connectable: boolean): string {
@@ -359,60 +346,34 @@ function describe(state: ConsoleState | "closed", connectable: boolean): string 
     }
 }
 
-function tooltip(e: Entry, state: ConsoleState | "closed", connectable: boolean): vscode.MarkdownString {
+function tooltip(
+    key: string,
+    state: ConsoleState | "closed",
+    connectable: boolean,
+    open: boolean,
+    editingKeys: boolean,
+): vscode.MarkdownString {
     const md = new vscode.MarkdownString();
-    md.appendText(`Simics command line of the TCF agent at ${e.key}: ${state === "closed" ? "not open" : state}.`);
+    md.appendText(`Simics command line of the TCF agent at ${key}: ${state === "closed" ? "not open" : state}.`);
     if (state === "connecting" || state === "connected") {
-        md.appendText(` Editing keys such as Ctrl+P go to ${e.editingKeys ? "Simics" : "VS Code"}.`);
+        md.appendText(` Editing keys such as Ctrl+P go to ${editingKeys ? "Simics" : "VS Code"}.`);
     } else if (connectable) {
         md.appendText(state === "closed" ? " Click to connect." : " Click to reconnect.");
     } else if (state === "disconnected") {
         md.appendText(" Click to show its output.");
     }
-    if (connectable && !simicsCliOptions(e.session.configuration).open) {
+    if (connectable && !open) {
         md.appendMarkdown(
-            '\n\nTo open it every time you attach, set `"open": true` under `consoles.simicsCli` ' +
-                "in the launch configuration.",
+            "\n\nTo open it every time you attach, turn on the setting `simics-target-debug.console.open`. " +
+                `[Open settings](command:${OPEN_SETTINGS})`,
         );
-        const folder = e.session.workspaceFolder;
-        if (folder) {
-            const launchJson = vscode.Uri.joinPath(folder.uri, ".vscode", "launch.json");
-            const args = encodeURIComponent(JSON.stringify([launchJson]));
-            md.appendMarkdown(` [Open launch configurations](command:${OPEN_LAUNCH_SETTINGS}?${args})`);
-            md.isTrusted = { enabledCommands: [OPEN_LAUNCH_SETTINGS] };
-        }
+        md.isTrusted = { enabledCommands: [OPEN_SETTINGS] };
     }
     return md;
 }
 
 function scrollbackLines(): number {
     return vscode.workspace.getConfiguration("terminal.integrated").get<number>("scrollback", 1000);
-}
-
-/** Does nothing for sessions that were not started from a configuration in the folder's launch.json. */
-async function saveEditingKeys(session: vscode.DebugSession, on: boolean): Promise<void> {
-    const folder = session.workspaceFolder;
-    if (!folder) {
-        return;
-    }
-    let document: vscode.TextDocument;
-    try {
-        document = await vscode.workspace.openTextDocument(vscode.Uri.joinPath(folder.uri, ".vscode", "launch.json"));
-    } catch {
-        return;
-    }
-    const text = document.getText();
-    const read = readConfigurations(text);
-    if (read.error !== undefined) {
-        throw new Error(read.error);
-    }
-    const name = session.configuration.name;
-    if (!read.configurations.some((c) => c.name === name)) {
-        return;
-    }
-    // On is the default, so it is removed rather than written.
-    const path = ["consoles", "simicsCli", "editingKeys"];
-    await applyAndSave(document, setNamedConfigurationValue(text, name, path, on ? undefined : false));
 }
 
 function loadHistory(saved: unknown): Map<string, ConsoleSession[]> {

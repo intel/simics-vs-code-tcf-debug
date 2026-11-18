@@ -118,15 +118,10 @@ export function setPathMapRules(
     );
 }
 
-/** Sets `key`, or the attribute at a path such as ["consoles", "simicsCli", "open"]; undefined removes it. */
-export function setNamedConfigurationValue(
-    text: string,
-    configName: string,
-    key: string | JSONPath,
-    value: unknown,
-): Edit[] {
+/** Sets the attribute `key`; undefined removes it. */
+export function setNamedConfigurationValue(text: string, configName: string, key: string, value: unknown): Edit[] {
     const config = namedConfiguration(text, configName);
-    return setValue(text, config.index, typeof key === "string" ? [key] : key, value, detectFormatting(text));
+    return setValue(text, config.index, [key], value, detectFormatting(text));
 }
 
 function namedConfiguration(text: string, configName: string): LaunchConfiguration {

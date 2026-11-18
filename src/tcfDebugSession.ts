@@ -54,9 +54,13 @@ import {
 import { toBigInt } from "./tcf/json";
 import { scanMemory } from "./shared/targetMemory/search";
 import * as req from "./tcfRequests";
-import { CONSOLE_AVAILABLE_EVENT, SimicsCliOptions, simicsCliOptions } from "./simicsConsole";
+import { CONSOLE_AVAILABLE_EVENT } from "./simicsConsole";
 import { CommandLineService } from "./tcf/services/commandLine";
 
+/**
+ * The launch configuration attributes, and the extension's settings that the
+ * extension adds as attributes, see sessionSettings in settings.ts.
+ */
 export interface TcfAttachArguments extends DebugProtocol.AttachRequestArguments {
     host?: string;
     port?: number;
@@ -64,8 +68,6 @@ export interface TcfAttachArguments extends DebugProtocol.AttachRequestArguments
     traceTcf?: boolean;
     /** TCF messages left out of the traceTcf log. */
     traceTcfSilence?: TraceSilenceRule[];
-    /** The Simics CLI terminal, see SimicsCliOptions. */
-    consoles?: { simicsCli?: Partial<SimicsCliOptions> };
     /** Show a header row at function entries in the Disassembly view. */
     disassemblyFunctionHeaders?: boolean;
     /** Maps path prefixes in the debug information to path prefixes on the host, in order. */
@@ -533,7 +535,7 @@ export class TcfDebugSession extends DebugSession {
             this.sendEvent(new Event("pathMapChanged"));
             this.reportMissingSymbolFiles();
             if (channel.hasService(CommandLineService.NAME)) {
-                this.sendEvent(new Event(CONSOLE_AVAILABLE_EVENT, { open: simicsCliOptions(args).open }));
+                this.sendEvent(new Event(CONSOLE_AVAILABLE_EVENT));
             }
         } catch (err) {
             this.disconnecting = true;

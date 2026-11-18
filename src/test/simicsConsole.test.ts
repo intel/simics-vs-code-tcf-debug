@@ -366,15 +366,17 @@ test("trimHistory keeps the last sessions and lines", () => {
     assert.deepEqual(trimHistory(sessions, 3, 5), [{ lines: ["d", "e", "f"], ended: 3 }]);
 });
 
-test("simicsCliOptions reads consoles.simicsCli, with defaults", () => {
+// settings.json may give any type, wrong ones give the defaults.
+test("simicsCliOptions checks the console settings, with defaults", () => {
     const defaults = { open: true, historySessions: 3, editingKeys: true };
     assert.deepEqual(simicsCliOptions({}), defaults);
-    assert.deepEqual(simicsCliOptions({ consoles: "x" }), defaults);
-    assert.deepEqual(
-        simicsCliOptions({ consoles: { simicsCli: { open: false, historySessions: 2.5, editingKeys: false } } }),
-        { open: false, historySessions: 2, editingKeys: false },
-    );
-    assert.equal(simicsCliOptions({ consoles: { simicsCli: { historySessions: -1 } } }).historySessions, 0);
+    assert.deepEqual(simicsCliOptions({ open: "x", historySessions: "2", editingKeys: null }), defaults);
+    assert.deepEqual(simicsCliOptions({ open: false, historySessions: 2.5, editingKeys: false }), {
+        open: false,
+        historySessions: 2,
+        editingKeys: false,
+    });
+    assert.equal(simicsCliOptions({ historySessions: -1 }).historySessions, 0);
 });
 
 test("isEmptySession: only blank lines and bare prompts", () => {

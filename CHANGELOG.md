@@ -8,13 +8,26 @@ All notable changes to the Simics Target Debug extension will be documented here
 
 - The Call Stack view shows the run control context hierarchy: each context
   with child contexts, such as a process of the Linux tracker, is a nested
-  session with its threads. Turn it off with `"callStackHierarchy": false`.
-  `"callStackCompact": false` gives every context a row of its own.
-  Containers with a single thread, such as most processes, show the thread in
-  the session above.
+  session with its threads. Turn it off with the setting
+  `simics-target-debug.callStack.hierarchy`. Turning off
+  `simics-target-debug.callStack.compact` gives every context a row of its
+  own. Containers with a single thread, such as most processes, show the
+  thread in the session above.
+- Simics Target Debug Settings: a form like TCF Launch Configurations, with
+  User and Workspace tabs, for the extension's settings and Stay in Console.
+  Open it with **Simics Target Debug: Open Settings**, or the gear button in
+  the Consoles view and in TCF Launch Configurations.
 
 ### Changed
 
+- Options that are the same for every session are settings instead of
+  launch configuration attributes, and are ignored in `launch.json`:
+  `consoles.simicsCli.*` are `simics-target-debug.console.*`,
+  `disassemblyFunctionHeaders` is
+  `simics-target-debug.disassembly.functionHeaders`, and `traceTcf` and
+  `traceTcfSilence` are `simics-target-debug.tcfTrace.enabled` and
+  `simics-target-debug.tcfTrace.silence`. The Consoles view's lock button
+  saves Editing Keys in the settings.
 - In TCF Launch Configurations, the Start, Duplicate and Delete buttons
   above the form, and the Add and Delete All buttons above the list, stay
   visible when you scroll.

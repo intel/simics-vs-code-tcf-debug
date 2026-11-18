@@ -21,9 +21,7 @@ import { DEFAULT_TRACE_SILENCE } from "@/tcf/traceSilence";
 const PACKAGE_JSON: unknown = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "..", "package.json"), "utf8"));
 
 // The form shows the attributes of the real package.json, in its order, then
-// the Console fold-down (with Stay in Console, a VS Code setting), then the
-// Advanced one with VS Code's Debug Console option. Attributes inside objects
-// get one field each, with their path.
+// the Advanced fold-down with VS Code's Debug Console option.
 test("launchFields reads the simics-target-debug attributes from package.json", () => {
     const fields = launchFields(PACKAGE_JSON, "simics-target-debug");
     assert.deepEqual(
@@ -33,20 +31,10 @@ test("launchFields reads the simics-target-debug attributes from package.json", 
             ["port", "number", undefined, "Port"],
             ["symbolFiles", "objectList", undefined, "Symbol Files"],
             ["pathMap", "objectList", undefined, "Path Map"],
-            ["consoles.simicsCli.open", "boolean", "console", "Open Console"],
-            ["consoles.simicsCli.historySessions", "integer", "console", "History Sessions"],
-            ["consoles.simicsCli.editingKeys", "boolean", "console", "Editing Keys"],
-            ["stayInConsole", "boolean", "console", "Stay in Console"],
             ["connectTimeout", "number", "advanced", "Connect Timeout"],
-            ["callStackHierarchy", "boolean", "advanced", "Call Stack Hierarchy"],
-            ["callStackCompact", "boolean", "advanced", "Call Stack Compact"],
-            ["disassemblyFunctionHeaders", "boolean", "advanced", "Disassembly Function Headers"],
             ["internalConsoleOptions", "enum", "advanced", "Debug Console"],
-            ["traceTcf", "boolean", "advanced", "Trace TCF"],
-            ["traceTcfSilence", "objectList", "advanced", "Trace TCF Silence"],
         ],
     );
-    assert.deepEqual(fields.map(fieldPath)[4], ["consoles", "simicsCli", "open"]);
     assert.deepEqual(fields.map(fieldPath)[0], ["host"]);
     const host = fields[0];
     assert.equal(host.label, "Host");
@@ -73,22 +61,7 @@ test("launchFields reads the simics-target-debug attributes from package.json", 
             ["absolute", "boolean", undefined],
         ],
     );
-    const silence = fields.find((f) => f.key === "traceTcfSilence");
-    assert.deepEqual(
-        silence?.columns?.map((c) => [c.key, c.kind, c.required, c.values]),
-        [
-            ["service", "string", true, undefined],
-            ["type", "multiEnum", undefined, ["*", "command", "event", "flowControl"]],
-            ["name", "string", undefined, undefined],
-        ],
-    );
-    assert.deepEqual(silence?.columns?.[1].valueLabels, ["*", "Command", "Event", "Flow Control"]);
-    assert.deepEqual(silence?.newItem, { service: "", type: ["*"], name: "*" });
     assert.equal(pathMap?.newItem, undefined);
-    const service = silence?.columns?.find((c) => c.key === "service");
-    assert.deepEqual(service?.suggestions?.slice(0, 3), ["*", "Breakpoints", "CommandLine"]);
-    assert.equal(service?.suggestions?.length, 31);
-    assert.equal(silence?.columns?.find((c) => c.key === "name")?.suggestions, undefined);
 });
 
 // Typed text matches anywhere, ignoring case, with matches at the start first.
@@ -102,12 +75,17 @@ test("filterSuggestions keeps matching suggestions, prefix matches first", () =>
     assert.deepEqual(filterSuggestions(services, "xyz"), []);
 });
 
-// The form shows the default items of traceTcfSilence, the session uses
-// DEFAULT_TRACE_SILENCE: they must be the same. The pathMap default is only a
-// completion template, the form must not show it as if it applied.
-test("list defaults in the form are the ones that apply", () => {
+// The session uses DEFAULT_TRACE_SILENCE when it gets no setting, and the
+// Settings editor shows the default in package.json: they must be the same.
+// The pathMap default is only a completion template, the form must not show
+// it as if it applied.
+test("list defaults in package.json are the ones that apply", () => {
+    const categories = (PACKAGE_JSON as { contributes: { configuration: { properties: Record<string, unknown> }[] } })
+        .contributes.configuration;
+    const key = "simics-target-debug.tcfTrace.silence";
+    const silence = categories.find((c) => key in c.properties)?.properties[key] as { default?: unknown };
+    assert.deepEqual(silence.default, DEFAULT_TRACE_SILENCE);
     const fields = launchFields(PACKAGE_JSON, "simics-target-debug");
-    assert.deepEqual(fields.find((f) => f.key === "traceTcfSilence")?.default, DEFAULT_TRACE_SILENCE);
     assert.equal(fields.find((f) => f.key === "pathMap")?.default, undefined);
 });
 
@@ -208,15 +186,12 @@ test("launchFields handles the attributes VS Code adds", () => {
         fields.map((f) => [f.key, f.kind]),
         [
             ["host", "string"],
-            ["stayInConsole", "boolean"],
             ["internalConsoleOptions", "enum"],
         ],
     );
-    const debugConsole = fields[2];
+    const debugConsole = fields[1];
     assert.ok(debugConsole.description);
     assert.deepEqual(debugConsole.valueLabels, ["Never", "When each session starts", "When the first session starts"]);
-    // Stored in debug.focusEditorOnBreak, not in launch.json.
-    assert.deepEqual(fields[1].setting, { section: "debug.focusEditorOnBreak", invert: true });
 });
 
 // Each JSON schema type maps to one kind of input. Lists of anything but

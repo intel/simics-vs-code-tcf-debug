@@ -17,7 +17,8 @@
     ],
     "main": "./out/extension.js",
     "activationEvents": [
-        "onDebugResolve:simics-target-debug"
+        "onDebugResolve:simics-target-debug",
+        "onLanguage:jsonc"
     ],
     "contributes": {
         "commands": [
@@ -92,6 +93,12 @@
                 "title": "Open launch.json as Text",
                 "category": "Simics Target Debug",
                 "icon": "$(json)"
+            },
+            {
+                "command": "simics-target-debug.openSettings",
+                "title": "Open Settings",
+                "category": "Simics Target Debug",
+                "icon": "$(settings)"
             },
             {
                 "command": "simics-target-debug.locateSourceFile",
@@ -213,13 +220,13 @@
             },
             {
                 "command": "simics-target-debug.consoleKeysToVsCode",
-                "title": "Editing keys such as Ctrl+P go to Simics. Click to leave them to VS Code (editingKeys in launch.json)",
+                "title": "Editing keys such as Ctrl+P go to Simics. Click to leave them to VS Code (Editing Keys setting)",
                 "category": "Simics Target Debug",
                 "icon": "$(lock)"
             },
             {
                 "command": "simics-target-debug.consoleKeysToSimics",
-                "title": "Editing keys such as Ctrl+P go to VS Code. Click to send them to Simics (editingKeys in launch.json)",
+                "title": "Editing keys such as Ctrl+P go to VS Code. Click to send them to Simics (Editing Keys setting)",
                 "category": "Simics Target Debug",
                 "icon": "$(unlock)"
             }
@@ -375,6 +382,11 @@
                     "group": "navigation"
                 },
                 {
+                    "command": "simics-target-debug.openSettings",
+                    "when": "activeCustomEditorId == 'simics-target-debug.launchSettings'",
+                    "group": "navigation"
+                },
+                {
                     "command": "simics-target-debug.newTargetMemory",
                     "when": "activeWebviewPanelId == 'simics-target-debug.targetMemory'",
                     "group": "navigation"
@@ -427,6 +439,11 @@
                     "command": "simics-target-debug.openConsole",
                     "when": "view == 'simics-target-debug.consoles' && debugType == 'simics-target-debug' && !simics-target-debug.hasConsoles",
                     "group": "navigation@1"
+                },
+                {
+                    "command": "simics-target-debug.openSettings",
+                    "when": "view == 'simics-target-debug.consoles'",
+                    "group": "navigation@2"
                 },
                 {
                     "command": "simics-target-debug.saveSymbolFiles",
@@ -640,6 +657,86 @@
                 "priority": "option"
             }
         ],
+        "configuration": [
+            {
+                "title": "Console",
+                "order": 1,
+                "properties": {
+                    "simics-target-debug.console.open": {
+                        "type": "boolean",
+                        "default": true,
+                        "markdownDescription": "Open the Simics CLI when a debug session attaches to an agent with the CommandLine service. When off, open it from the Consoles view. When on, the Debug Console does not open at start.\n\nTo keep the focus in the Simics CLI when the target stops, so that Enter repeats the command, turn off `#debug.focusEditorOnBreak#`."
+                    },
+                    "simics-target-debug.console.historySessions": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "default": 3,
+                        "description": "How many earlier sessions with the same agent to show above the command line. 0 turns it off."
+                    },
+                    "simics-target-debug.console.editingKeys": {
+                        "type": "boolean",
+                        "default": true,
+                        "description": "Send keys such as Ctrl+P and Ctrl+R to Simics instead of VS Code while the Simics CLI has focus. The lock button in the Consoles view switches it."
+                    }
+                }
+            },
+            {
+                "title": "Call Stack",
+                "order": 2,
+                "properties": {
+                    "simics-target-debug.callStack.hierarchy": {
+                        "type": "boolean",
+                        "default": true,
+                        "description": "Show the run control context hierarchy in the Call Stack view: each context with child contexts and two or more threads (for example a multi-threaded process of an OS awareness tracker) becomes a nested session that holds its threads. Turn off to list all threads directly under the debug session, with their full names. Used by debug sessions started after a change."
+                    },
+                    "simics-target-debug.callStack.compact": {
+                        "type": "boolean",
+                        "default": true,
+                        "markdownDescription": "With `#simics-target-debug.callStack.hierarchy#` on, let VS Code show a context in one row with its parent when it is the parent's only child. The row shows the name of the innermost context only. Turn off to give every context a row of its own, below a row for the debug session. Used by debug sessions started after a change."
+                    }
+                }
+            },
+            {
+                "title": "Disassembly",
+                "order": 3,
+                "properties": {
+                    "simics-target-debug.disassembly.functionHeaders": {
+                        "type": "boolean",
+                        "default": true,
+                        "description": "Show a header row with source file, line and name above the first instruction of each function in the Disassembly view. Needs the agent's Symbols service and the setting debug.disassemblyView.showSourceCode. Turn off to save the symbol lookups. Used by debug sessions started after a change."
+                    }
+                }
+            },
+            {
+                "title": "TCF Trace",
+                "order": 4,
+                "properties": {
+                    "simics-target-debug.tcfTrace.enabled": {
+                        "type": "boolean",
+                        "default": false,
+                        "markdownDescription": "Log TCF traffic to the Output view, in the \"Simics Target Debug\" log. `#simics-target-debug.tcfTrace.silence#` selects messages to leave out. Used by debug sessions started after a change."
+                    },
+                    "simics-target-debug.tcfTrace.silence": {
+                        "type": "array",
+                        "markdownDescription": "TCF messages left out of the TCF trace. Each item is a rule `service/type/name`. `*` or a left-out part matches anything, and `type` can be several of `command`, `event` and `flowControl`, separated by commas. A command's results (R, P and N) count as the command. Flow control messages have no service or name, so only `*/flowControl` matches them. Remove a rule to log its messages. An empty list logs everything.",
+                        "items": {
+                            "type": "string",
+                            "pattern": "^[^/]+(/(\\*|(command|event|flowControl)(,(command|event|flowControl))*)(/[^/]+)?)?$",
+                            "patternErrorMessage": "Use service/type/name, for example Locator/event/peerHeartBeat or CommandLine."
+                        },
+                        "uniqueItems": true,
+                        "default": [
+                            "Locator/event/peerHeartBeat",
+                            "Locator/event/peerAdded",
+                            "Locator/event/peerRemoved",
+                            "Locator/event/peerChanged",
+                            "CommandLine",
+                            "SimicsLogs/event"
+                        ]
+                    }
+                }
+            }
+        ],
         "debuggers": [
             {
                 "type": "simics-target-debug",
@@ -746,187 +843,6 @@
                                         "destination": "${workspaceFolder}"
                                     }
                                 ]
-                            },
-                            "consoles": {
-                                "type": "object",
-                                "description": "Consoles opened with the debug session.",
-                                "additionalProperties": false,
-                                "properties": {
-                                    "simicsCli": {
-                                        "type": "object",
-                                        "description": "The Simics command line (Simics CLI), if the agent has the CommandLine service.",
-                                        "additionalProperties": false,
-                                        "properties": {
-                                            "open": {
-                                                "type": "boolean",
-                                                "description": "Open the Simics CLI after attaching. When off, open it from the Consoles view.",
-                                                "default": true
-                                            },
-                                            "historySessions": {
-                                                "type": "integer",
-                                                "minimum": 0,
-                                                "description": "How many earlier sessions with the same agent to show above the command line. 0 turns it off.",
-                                                "default": 3
-                                            },
-                                            "editingKeys": {
-                                                "type": "boolean",
-                                                "description": "Send keys such as Ctrl+P and Ctrl+R to Simics instead of VS Code while the Simics CLI has focus.",
-                                                "default": true
-                                            }
-                                        }
-                                    }
-                                }
-                            },
-                            "traceTcf": {
-                                "type": "boolean",
-                                "description": "Log TCF traffic to the Output view, in the \"Simics Target Debug\" log. traceTcfSilence selects messages to leave out.",
-                                "default": false
-                            },
-                            "traceTcfSilence": {
-                                "type": "array",
-                                "description": "TCF messages left out of the traceTcf log. Each item silences the messages of a service with one of the given types and a name. \"*\" matches anything. A command's results (R, P and N) count as the command. Flow control messages have no service or name, so only items with \"*\" for both match them. If not set, Locator peer events (such as the heartbeat) and the Simics CLI (CommandLine) are silenced. An empty list logs everything.",
-                                "items": {
-                                    "type": "object",
-                                    "required": [
-                                        "service"
-                                    ],
-                                    "additionalProperties": false,
-                                    "properties": {
-                                        "service": {
-                                            "type": "string",
-                                            "minLength": 1,
-                                            "description": "TCF service, for example CommandLine, Locator, RunControl or Breakpoints, or \"*\" for all.",
-                                            "examples": [
-                                                "*",
-                                                "Breakpoints",
-                                                "CommandLine",
-                                                "ContextQuery",
-                                                "ContextReset",
-                                                "Disassembly",
-                                                "DPrintf",
-                                                "Expressions",
-                                                "ITP",
-                                                "LineNumbers",
-                                                "Locator",
-                                                "Memory",
-                                                "MemoryDevices",
-                                                "MemoryMap",
-                                                "PathMap",
-                                                "Registers",
-                                                "RegistersExt",
-                                                "RunControl",
-                                                "Simics",
-                                                "SimicsExecTraces",
-                                                "SimicsLogs",
-                                                "Simulation",
-                                                "SimUtils",
-                                                "StackTrace",
-                                                "Streams",
-                                                "Symbols",
-                                                "SymbolsProxyV1",
-                                                "SymbolsProxyV2",
-                                                "TargetIdentification",
-                                                "Trace",
-                                                "ZeroCopy"
-                                            ]
-                                        },
-                                        "type": {
-                                            "type": "array",
-                                            "description": "Message types to silence. \"*\" means all types.",
-                                            "minItems": 1,
-                                            "uniqueItems": true,
-                                            "items": {
-                                                "type": "string",
-                                                "enum": [
-                                                    "*",
-                                                    "command",
-                                                    "event",
-                                                    "flowControl"
-                                                ],
-                                                "enumItemLabels": [
-                                                    "*",
-                                                    "Command",
-                                                    "Event",
-                                                    "Flow Control"
-                                                ],
-                                                "enumDescriptions": [
-                                                    "All message types.",
-                                                    "Commands sent to the agent (C) and their results (R, P and N).",
-                                                    "Events from the agent (E).",
-                                                    "Flow control messages (F). They have no service or name."
-                                                ]
-                                            },
-                                            "default": [
-                                                "*"
-                                            ]
-                                        },
-                                        "name": {
-                                            "type": "string",
-                                            "minLength": 1,
-                                            "description": "Command or event name, or \"*\" for all. A command's results have its name.",
-                                            "default": "*"
-                                        }
-                                    },
-                                    "default": {
-                                        "service": "",
-                                        "type": [
-                                            "*"
-                                        ],
-                                        "name": "*"
-                                    }
-                                },
-                                "default": [
-                                    {
-                                        "service": "Locator",
-                                        "type": [
-                                            "event"
-                                        ],
-                                        "name": "peerHeartBeat"
-                                    },
-                                    {
-                                        "service": "Locator",
-                                        "type": [
-                                            "event"
-                                        ],
-                                        "name": "peerAdded"
-                                    },
-                                    {
-                                        "service": "Locator",
-                                        "type": [
-                                            "event"
-                                        ],
-                                        "name": "peerRemoved"
-                                    },
-                                    {
-                                        "service": "Locator",
-                                        "type": [
-                                            "event"
-                                        ],
-                                        "name": "peerChanged"
-                                    },
-                                    {
-                                        "service": "CommandLine",
-                                        "type": [
-                                            "*"
-                                        ],
-                                        "name": "*"
-                                    }
-                                ]
-                            },
-                            "disassemblyFunctionHeaders": {
-                                "type": "boolean",
-                                "description": "Show a header row with source file, line and name above the first instruction of each function in the Disassembly view. Needs the agent's Symbols service and the setting debug.disassemblyView.showSourceCode. Turn off to save the symbol lookups.",
-                                "default": true
-                            },
-                            "callStackHierarchy": {
-                                "type": "boolean",
-                                "description": "Show the run control context hierarchy in the Call Stack view: each context with child contexts and two or more threads (for example a multi-threaded process of an OS awareness tracker) becomes a nested session that holds its threads. Turn off to list all threads directly under the debug session, with their full names.",
-                                "default": true
-                            },
-                            "callStackCompact": {
-                                "type": "boolean",
-                                "description": "With callStackHierarchy, let VS Code show a context in one row with its parent when it is the parent's only child. The row shows the name of the innermost context only. Turn off to give every context a row of its own, below a row for the debug session.",
-                                "default": true
                             }
                         }
                     }

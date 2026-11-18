@@ -18,7 +18,7 @@ import {
 } from "@vscode/debugadapter";
 import { DebugProtocol } from "@vscode/debugprotocol";
 import { TcfChannel, TcfError, TraceFn, formatTcfError } from "./tcf/channel";
-import { TraceSilenceRule, isSilenced, parseTraceSilence } from "./tcf/traceSilence";
+import { isSilenced, parseTraceSilence } from "./tcf/traceSilence";
 import { ResumeMode, RunControlContext, RunControlService } from "./tcf/services/runControl";
 import { RegistersContext, RegistersService } from "./tcf/services/registers";
 import { CodeArea, LineNumbersService } from "./tcf/services/lineNumbers";
@@ -54,18 +54,20 @@ import {
 import { toBigInt } from "./tcf/json";
 import { scanMemory } from "./shared/targetMemory/search";
 import * as req from "./tcfRequests";
-import { CONSOLE_AVAILABLE_EVENT, SimicsCliOptions, simicsCliOptions } from "./simicsConsole";
+import { CONSOLE_AVAILABLE_EVENT } from "./simicsConsole";
 import { CommandLineService } from "./tcf/services/commandLine";
 
+/**
+ * The launch configuration attributes, and the extension's settings that the
+ * extension adds as attributes, see sessionSettings in settings.ts.
+ */
 export interface TcfAttachArguments extends DebugProtocol.AttachRequestArguments {
     host?: string;
     port?: number;
     connectTimeout?: number;
     traceTcf?: boolean;
-    /** TCF messages left out of the traceTcf log. */
-    traceTcfSilence?: TraceSilenceRule[];
-    /** The Simics CLI terminal, see SimicsCliOptions. */
-    consoles?: { simicsCli?: Partial<SimicsCliOptions> };
+    /** TCF messages left out of the traceTcf log, see parseTraceSilence. */
+    traceTcfSilence?: string[];
     /** Show a header row at function entries in the Disassembly view. */
     disassemblyFunctionHeaders?: boolean;
     /** Maps path prefixes in the debug information to path prefixes on the host, in order. */
@@ -389,10 +391,10 @@ export class TcfDebugSession extends DebugSession {
         let trace: TraceFn | undefined;
         if (args.traceTcf) {
             const { rules, invalid } = parseTraceSilence(args.traceTcfSilence);
-            for (const e of invalid) {
+            for (const item of invalid) {
                 this.log(
-                    `traceTcfSilence: ignoring ${JSON.stringify(e)}. Entries need a "service" string, ` +
-                        `"name" must be a string and "type" a list of message types, if given.\n`,
+                    `simics-target-debug.tcfTrace.silence: ignoring ${JSON.stringify(item)}. Rules are ` +
+                        `"service/type/name", type is "*" or message types separated by commas.\n`,
                     "stderr",
                 );
             }
@@ -533,7 +535,7 @@ export class TcfDebugSession extends DebugSession {
             this.sendEvent(new Event("pathMapChanged"));
             this.reportMissingSymbolFiles();
             if (channel.hasService(CommandLineService.NAME)) {
-                this.sendEvent(new Event(CONSOLE_AVAILABLE_EVENT, { open: simicsCliOptions(args).open }));
+                this.sendEvent(new Event(CONSOLE_AVAILABLE_EVENT));
             }
         } catch (err) {
             this.disconnecting = true;

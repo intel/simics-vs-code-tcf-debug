@@ -530,3 +530,14 @@ code {
     background: var(--vscode-inputValidation-errorBackground);
     border: 1px solid var(--vscode-inputValidation-errorBorder);
 }
+
+.settings-hint {
+    max-width: 800px;
+    margin: 16px 0 0;
+    padding: 10px 14px;
+    color: var(--vscode-descriptionForeground);
+}
+
+.settings-hint button.link {
+    padding: 0;
+}

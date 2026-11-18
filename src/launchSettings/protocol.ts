@@ -1,7 +1,7 @@
 import type { LaunchConfiguration } from "./launchJson";
 import type { Field } from "./schema";
 
-/** Sent to the webview when it starts and after every change of launch.json. */
+/** Sent to the launch form when it starts and after every change of launch.json. */
 export interface StateMessage {
     type: "state";
     fields: Field[];
@@ -14,22 +14,13 @@ export interface StateMessage {
     missingPaths: string[];
     /** Agents (see agentAddress) a Simics Target Debug session runs on or is starting on. */
     busyAgents: string[];
-    /** Values of the fields stored in VS Code settings, by field key. */
-    settings: Record<string, SettingValue>;
-}
-
-export interface SettingValue {
-    /** The value the field shows, already inverted if the field says so. */
-    value: unknown;
-    /** Set in the workspace settings, so it can be reset. */
-    modified: boolean;
 }
 
 export type JsonPath = (string | number)[];
 
 /**
- * Sent by the webview. `index` and `name` say which configuration the form
- * showed, so a change is refused if launch.json changed under the form.
+ * Sent by the launch form. `index` and `name` say which configuration the
+ * form showed, so a change is refused if launch.json changed under the form.
  */
 export type WebviewMessage =
     | { type: "ready" }
@@ -42,6 +33,5 @@ export type WebviewMessage =
     | { type: "delete"; index: number; name: string }
     | { type: "deleteAll"; configurations: { index: number; name: string }[] }
     | { type: "start"; index: number; name: string }
-    /** Set the VS Code setting of a field with `setting`; no value resets it. */
-    | { type: "setSetting"; key: string; value?: unknown }
+    | { type: "openSettings" }
     | { type: "openText" };

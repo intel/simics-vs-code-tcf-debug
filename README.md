@@ -129,17 +129,16 @@ Groups come and go as processes and threads start and end. All groups share
 the breakpoints and the Debug Console. Stopping or restarting any of them
 stops or restarts the whole debug session.
 
-Two options change the layout. You find them under **Advanced** in the
-launch configurations editor:
+Two [settings](#settings) change the layout:
 
-- `"callStackHierarchy": false` shows no groups. All threads are listed
-  directly under the debug configuration, named by all the parts above them,
-  like `board.cpu0`. In the example, the threads are named
+- Turning off `simics-target-debug.callStack.hierarchy` shows no groups. All
+  threads are listed directly under the debug configuration, named by all the
+  parts above them, like `board.cpu0`. In the example, the threads are named
   `Linux.Kernel.Idle.core[0][0]`, `Linux.Userspace.init.init` and so on.
-- `"callStackCompact": false` gives every group a row of its own. By default,
-  a group that is alone in its parent shares the parent's row and shows its
-  own name only, like `Linux` in the example. With `false`, the name of the
-  debug configuration gets a row of its own above `Linux`.
+- Turning off `simics-target-debug.callStack.compact` gives every group a row
+  of its own. By default, a group that is alone in its parent shares the
+  parent's row and shows its own name only, like `Linux` in the example. When
+  off, the name of the debug configuration gets a row of its own above `Linux`.
 
 The call stack of a suspended thread comes from the `StackTrace` service. VS
 Code first loads the top frame and then the rest in pages ("Load More Stack
@@ -205,8 +204,8 @@ provider. Inlined functions get no header. A function is looked up once
 (`Symbols.findByAddr` and `getContext`) and covers all its instructions;
 results are kept until the memory map changes. Code without symbols needs a
 lookup per instruction, so at most 64 lookups are made per request, nearest the
-requested address first. Turn them off with `"disassemblyFunctionHeaders":
-false` (under **Advanced** in the launch configurations editor).
+requested address first. Turn them off with the setting
+`simics-target-debug.disassembly.functionHeaders`.
 
 ### Stepping
 
@@ -361,15 +360,8 @@ editor title bar of the view) opens another one. Unreadable bytes are shown as
 ### Simics console
 
 When the agent has the Simics `CommandLine` service, the Simics command line
-opens in a terminal named **Simics CLI** after attaching. Its options are
-under `consoles.simicsCli`, or **Console** in the launch configurations
-editor:
-
-```json
-"consoles": {
-    "simicsCli": { "open": true, "historySessions": 3, "editingKeys": true }
-}
-```
+opens in a terminal named **Simics CLI** after attaching. Its options are the
+`simics-target-debug.console.*` [settings](#settings):
 
 - `open`: open the console after attaching. When off, open it from the
   Consoles view. When on, the Debug Console does not open at start.
@@ -386,13 +378,13 @@ editor:
 - Ctrl+C copies the selection and stops the simulation. Ctrl+D is not sent.
 - `editingKeys` sends Ctrl+E, F, G, K, P, R, W (and Ctrl+_ on Windows) to
   Simics instead of VS Code while the console has focus. The lock button in
-  the Consoles view switches it and saves it in launch.json.
-- **Stay in Console** keeps the focus in the console when the target stops,
-  so that Enter repeats for example `step-line`. It sets
-  `debug.focusEditorOnBreak` in the workspace settings.
+  the Consoles view switches it, in the workspace settings if they set it,
+  else in the user settings.
+- To keep the focus in the console when the target stops, so that Enter
+  repeats for example `step-line`, turn off the VS Code setting
+  `debug.focusEditorOnBreak`.
 - Simics log messages are shown in the console. The console's TCF traffic is
-  left out of the `"traceTcf": true` log unless `traceTcfSilence` is changed,
-  see [TCF trace](#tcf-trace).
+  left out of the [TCF trace](#tcf-trace) unless the silence list is changed.
 
 ## Building
 
@@ -457,45 +449,70 @@ Install the generated `.vsix` file in VS Code:
 
 Configuration attributes:
 
-| Attribute                    | Default     | Description                                          |
-|------------------------------|-------------|------------------------------------------------------|
-| `host`                       | `localhost` | Host of the TCF agent                                |
-| `port`                       | `1534`      | TCP port of the TCF agent                            |
-| `connectTimeout`             | `10000`     | Milliseconds to wait for the agent's `Locator.Hello` |
-| `pathMap`                    | `[]`        | Source path mapping rules, see below                 |
-| `symbolFiles`                | `[]`        | Symbol files to load, see below                      |
-| `traceTcf`                   | `false`     | Log TCF messages to Output › Simics Target Debug     |
-| `traceTcfSilence`            | see below   | TCF messages left out of the `traceTcf` log          |
-| `disassemblyFunctionHeaders` | `true`      | Function header rows in the Disassembly view         |
-| `callStackHierarchy`         | `true`      | A nested session per container context in the Call Stack view |
-| `callStackCompact`           | `true`      | Contexts that are the only child share a row with their parent |
+| Attribute        | Default     | Description                                          |
+|------------------|-------------|------------------------------------------------------|
+| `host`           | `localhost` | Host of the TCF agent                                |
+| `port`           | `1534`      | TCP port of the TCF agent                            |
+| `connectTimeout` | `10000`     | Milliseconds to wait for the agent's `Locator.Hello` |
+| `pathMap`        | `[]`        | Source path mapping rules, see below                 |
+| `symbolFiles`    | `[]`        | Symbol files to load, see below                      |
+
+### Settings
+
+Options that are the same for all debug sessions are VS Code settings, in
+the user or workspace settings.
+
+| Setting (`simics-target-debug.` ...) | Default   | Description                                          |
+|--------------------------------------|-----------|------------------------------------------------------|
+| `console.open`                       | `true`    | Open the Simics CLI after attaching, see [Simics console](#simics-console) |
+| `console.historySessions`            | `3`       | Earlier sessions shown above the Simics CLI          |
+| `console.editingKeys`                | `true`    | Send editing keys such as Ctrl+P to Simics           |
+| `callStack.hierarchy`                | `true`    | A nested session per container context in the Call Stack view |
+| `callStack.compact`                  | `true`    | Contexts that are the only child share a row with their parent |
+| `disassembly.functionHeaders`        | `true`    | Function header rows in the Disassembly view         |
+| `tcfTrace.enabled`                   | `false`   | Log TCF messages to Output › Simics Target Debug     |
+| `tcfTrace.silence`                   | see below | TCF messages left out of the TCF trace               |
+
+The call stack, disassembly and TCF trace settings are read when a debug
+session starts.
+
+**Simics Target Debug: Open Settings** in the Command Palette, or the gear
+button in the Consoles view and in the launch configurations editor, shows
+them in the Settings editor.
 
 ### TCF trace
 
-`"traceTcf": true` logs the TCF messages between VS Code and the agent in
-Output › Simics Target Debug. `traceTcfSilence` lists the messages to leave
-out. The default silences the agent's `Locator` peer events, such as the
-heartbeat, and the Simics console (the `CommandLine` service):
+Turn on `simics-target-debug.tcfTrace.enabled` to log the TCF messages
+between VS Code and the agent in Output › Simics Target Debug.
+`simics-target-debug.tcfTrace.silence` lists the messages to leave out, as
+`service/type/name` rules. The default silences the agent's `Locator` peer
+events, such as the heartbeat, the Simics console (the `CommandLine`
+service) and Simics log events (`SimicsLogs`):
 
 ```json
-"traceTcfSilence": [
-  { "service": "Locator", "type": ["event"], "name": "peerHeartBeat" },
-  { "service": "Locator", "type": ["event"], "name": "peerAdded" },
-  { "service": "Locator", "type": ["event"], "name": "peerRemoved" },
-  { "service": "Locator", "type": ["event"], "name": "peerChanged" },
-  { "service": "CommandLine", "type": ["*"], "name": "*" }
+"simics-target-debug.tcfTrace.silence": [
+  "Locator/event/peerHeartBeat",
+  "Locator/event/peerAdded",
+  "Locator/event/peerRemoved",
+  "Locator/event/peerChanged",
+  "CommandLine",
+  "SimicsLogs/event"
 ]
 ```
 
-- An item silences the messages of `service` that have one of the types in
-  `type` and are called `name`. `"*"` matches anything, and is used if `type`
-  or `name` is left out.
+- A rule silences the messages of `service` that have one of the types and
+  are called `name`. `*`, or a part left out, matches anything.
 - The types are `command` (a command C and its results R, P and N, which the
   agent sends back with the command's token), `event` (E) and `flowControl`
-  (F). A command's results have its service and name.
-- Flow control messages have no service or name, so only items with `"*"`
-  for both silence them.
-- A list in `launch.json` replaces the default. `[]` logs everything.
+  (F), separated by commas, for example `Memory/command,event`. A command's
+  results have its service and name.
+- Flow control messages have no service or name, so only `*/flowControl`
+  silences them.
+- Rules for services the agent does not have match nothing and do no harm.
+- A list in the settings replaces the default. Remove a rule to log its
+  messages, `[]` logs everything.
+- In `settings.json`, the services of the Simics TCF agent and the message
+  types are suggested while you type a rule.
 
 ### Launch configurations editor
 
@@ -511,13 +528,6 @@ buttons in the editor title switch between the form and the text of
   value is rewritten, so comments, formatting and other debug types are kept.
 - Text boxes write their value when they lose focus or Enter is pressed.
   **Reset** removes an attribute, so its default is used.
-- A list with a default, like `traceTcfSilence`, shows the default items while
-  it is not set. The first change writes the changed list to `launch.json`.
-- In the `traceTcfSilence` table, **Type** is a dropdown with a checkbox for
-  each message type. Checking `*` unchecks the others. Checking **Flow Control**
-  sets **Service** and **Name** to `*`. New rows get `*` as type and name.
-  **Service** suggests `*` and the services of the Simics TCF agent while you
-  type, or with its arrow button; any other service name can be typed too.
 - **Add**, **Duplicate** and **Delete** manage whole configurations. New names
   are made unique.
 - Changes made in the text editor show up in the form at once. While
@@ -525,12 +535,11 @@ buttons in the editor title switch between the form and the text of
 - The fields come from `configurationAttributes` in `package.json`, so new
   attributes appear without changes to the form. Of VS Code's own options
   only `internalConsoleOptions` (when to open the Debug Console) is shown,
-  under **Advanced** at the end, with `connectTimeout`, `callStackHierarchy`,
-  `callStackCompact`, `disassemblyFunctionHeaders`, `traceTcf` and `traceTcfSilence`. The Simics console options
-  and **Stay in Console** are under **Console**, just before **Advanced**.
-  Others, like
+  under **Advanced** at the end, with `connectTimeout`. Others, like
   `preLaunchTask`, are listed under **Other Attributes** when set, and can be
   edited in the text.
+- The options that apply to all configurations are [settings](#settings),
+  see the link at the end of the form.
 
 Attributes in the `launch` section of a `.code-workspace` file are not shown.
 

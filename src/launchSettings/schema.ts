@@ -16,8 +16,6 @@ export type FieldKind =
     | "objectList"
     | "unsupported";
 
-export type FieldGroup = "console" | "advanced";
-
 export interface Field {
     key: string;
     /** Where the attribute is, for attributes inside objects. Their key is the path joined by dots. */
@@ -44,12 +42,7 @@ export interface Field {
      */
     browse?: "file" | "fileOrFolder";
     /** Set for fields the form shows last, in a fold-down that is closed at first. */
-    group?: FieldGroup;
-    /**
-     * Set for fields stored in a VS Code setting of the workspace instead of
-     * launch.json. With `invert`, the field shows the opposite boolean value.
-     */
-    setting?: { section: string; invert?: boolean };
+    group?: "advanced";
 }
 
 /*
@@ -81,64 +74,18 @@ export const VSCODE_FIELDS: Field[] = [
         description:
             "When to open the Debug Console: never, every time a session starts, or only " +
             "when the first session starts. If not set, the setting debug.internalConsoleOptions decides. " +
-            "Not used while Open Console is on: the Debug Console then never opens.",
+            "Not used while the setting simics-target-debug.console.open is on: the Debug Console then never opens.",
     },
 ];
 
 const VSCODE_KEYS = new Set(VSCODE_FIELDS.map((f) => f.key));
 
-/** Fields stored in VS Code settings, the same for all configurations. */
-export const SETTING_FIELDS: Field[] = [
-    {
-        key: "stayInConsole",
-        label: "Stay in Console",
-        kind: "boolean",
-        default: false,
-        setting: { section: "debug.focusEditorOnBreak", invert: true },
-        description:
-            "Keep the focus in the Simics CLI when the target stops, so that Enter repeats the command. " +
-            "Sets debug.focusEditorOnBreak for the workspace.",
-    },
-];
-
-/** The fold-downs, in this order, with their fields in order and shorter labels under the heading. */
-const GROUPS: { group: FieldGroup; keys: string[]; labels?: Record<string, string> }[] = [
-    {
-        group: "console",
-        keys: [
-            "consoles.simicsCli.open",
-            "consoles.simicsCli.historySessions",
-            "consoles.simicsCli.editingKeys",
-            "stayInConsole",
-        ],
-        labels: {
-            "consoles.simicsCli.open": "Open Console",
-            "consoles.simicsCli.historySessions": "History Sessions",
-            "consoles.simicsCli.editingKeys": "Editing Keys",
-        },
-    },
-    {
-        group: "advanced",
-        keys: [
-            "connectTimeout",
-            "callStackHierarchy",
-            "callStackCompact",
-            "disassemblyFunctionHeaders",
-            "internalConsoleOptions",
-            "traceTcf",
-            "traceTcfSilence",
-        ],
-    },
-];
-
-/** List attributes whose default is used when they are not set. Other list defaults are only completion templates. */
-const LIST_DEFAULT_KEYS = new Set(["traceTcfSilence"]);
-
-const GROUPED_KEYS = new Set(GROUPS.flatMap((g) => g.keys));
+/** The attributes in the Advanced fold-down, in this order. */
+const ADVANCED_KEYS = ["connectTimeout", "internalConsoleOptions"];
 
 /**
  * The fields of an "attach" configuration of `debugType`: its own attributes
- * in package.json order, then the grouped ones.
+ * in package.json order, then the advanced ones.
  */
 export function launchFields(packageJson: unknown, debugType: string): Field[] {
     const attach = debugger_(packageJson, debugType)?.configurationAttributes?.attach;
@@ -149,13 +96,12 @@ export function launchFields(packageJson: unknown, debugType: string): Field[] {
     const own = attributeFields(properties, attach?.required).filter(
         (f) => !HIDDEN_KEYS.has(f.key) && !VSCODE_KEYS.has(f.key),
     );
-    const all = [...own, ...VSCODE_FIELDS, ...SETTING_FIELDS];
-    const grouped = GROUPS.flatMap(({ group, keys, labels }) =>
-        keys
-            .flatMap((k) => all.filter((f) => f.key === k))
-            .map((f) => ({ ...f, group, label: labels?.[f.key] ?? f.label })),
-    );
-    return [...all.filter((f) => !GROUPED_KEYS.has(f.key)), ...grouped];
+    const all = [...own, ...VSCODE_FIELDS];
+    const advanced = ADVANCED_KEYS.flatMap((k) => all.filter((f) => f.key === k)).map((f) => ({
+        ...f,
+        group: "advanced" as const,
+    }));
+    return [...all.filter((f) => !ADVANCED_KEYS.includes(f.key)), ...advanced];
 }
 
 /** The configuration used for "Add configuration": the first initial configuration. */
@@ -369,9 +315,8 @@ function field(key: string, schema: Schema, required: boolean): Field {
         if (isObject(items.default)) {
             f.newItem = items.default;
         }
-        if (!LIST_DEFAULT_KEYS.has(key)) {
-            delete f.default;
-        }
+        // A list default in package.json is only a completion template.
+        delete f.default;
     }
     return f;
 }

@@ -26,8 +26,10 @@ import {
 } from "./symbolFiles";
 import { suggestSymbolPaths } from "./symbolPath";
 import { registerConsolesView } from "./consolesView";
-import { CONSOLE_AVAILABLE_EVENT, simicsCliOptions } from "./simicsConsole";
+import { CONSOLE_AVAILABLE_EVENT } from "./simicsConsole";
 import { SimicsConsoleManager } from "./simicsConsoleManager";
+import { consoleSettings, sessionSettings } from "./settings";
+import { registerSettingsView } from "./launchSettings/settingsView";
 import {
     ContextSessionManager,
     activeRootSession,
@@ -101,7 +103,7 @@ export function activate(context: vscode.ExtensionContext): void {
                 void sourceLocator.sourceNotFound(event.session, event.body as MissingSource);
             }
             if (event.session.type === DEBUG_TYPE && event.event === CONSOLE_AVAILABLE_EVENT) {
-                consoles.available(event.session, (event.body as { open?: unknown } | undefined)?.open !== false);
+                consoles.available(event.session);
             }
         }),
         consoles,
@@ -145,6 +147,7 @@ export function activate(context: vscode.ExtensionContext): void {
         new TargetMemoryManager(context, DEBUG_TYPE),
     );
     registerLaunchSettings(context);
+    registerSettingsView(context);
     registerPathMapView(context);
     registerConsolesView(context, [consoles]);
 }
@@ -1079,8 +1082,10 @@ class TcfConfigurationProvider implements vscode.DebugConfigurationProvider {
                 return f;
             });
         }
+        // Settings replace any attributes of the same name in launch.json.
+        Object.assign(config, sessionSettings());
         // The Simics CLI opens in the same panel, so the Debug Console would only flash by.
-        if (simicsCliOptions(config).open) {
+        if (consoleSettings().open) {
             config.internalConsoleOptions = "neverOpen";
         }
         return config;

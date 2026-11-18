@@ -97,18 +97,6 @@ test("saving symbol files refuses missing, duplicate, and invalid configurations
     }
 });
 
-test("the editing keys button writes and removes a nested attribute", () => {
-    const path = ["consoles", "simicsCli", "editingKeys"];
-    const off = apply(LAUNCH, setNamedConfigurationValue(LAUNCH, "Target", path, false));
-    assert.deepEqual(values(off, 1).consoles, { simicsCli: { editingKeys: false } });
-    const on = apply(off, setNamedConfigurationValue(off, "Target", path, undefined));
-    assert.deepEqual(values(on, 1), values(LAUNCH, 1));
-    const withOpen = apply(LAUNCH, setValue(LAUNCH, 1, ["consoles", "simicsCli", "open"], false, FMT));
-    const both = apply(withOpen, setNamedConfigurationValue(withOpen, "Target", path, false));
-    const back = apply(both, setNamedConfigurationValue(both, "Target", path, undefined));
-    assert.deepEqual(values(back, 1).consoles, { simicsCli: { open: false } });
-});
-
 test("saving session rules replaces only the named TCF pathMap", () => {
     const rules = [
         { source: "/second", destination: "${workspaceFolder}/second" },

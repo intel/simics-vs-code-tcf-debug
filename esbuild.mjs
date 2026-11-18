@@ -112,7 +112,7 @@ const contexts = tests
               minify: production,
               logLevel: "info",
           }),
-          // The launch settings form, also writes out/webview/launchSettings.css.
+          // The launch settings form and the settings view, also writes out/webview/launchSettings.css.
           await esbuild.context({
               ...common,
               format: "iife",
@@ -121,6 +121,7 @@ const contexts = tests
               plugins: watchPlugins(),
               entryPoints: [
                   "src/launchSettings/webview/launchSettings.ts",
+                  "src/launchSettings/webview/settings.ts",
                   "src/launchSettings/webview/launchSettings.css",
               ],
               outdir: "out/webview",

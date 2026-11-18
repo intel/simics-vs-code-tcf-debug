@@ -1,4 +1,4 @@
-/* Launch configurations form. Colours come from the VS Code theme, like in the Settings editor. */
+/* Launch configurations form and settings view. Colours come from the VS Code theme, like in the Settings editor. */
 
 @import "@vscode/codicons/dist/codicon.css";
 
@@ -529,4 +529,49 @@ code {
     padding: 8px 12px;
     background: var(--vscode-inputValidation-errorBackground);
     border: 1px solid var(--vscode-inputValidation-errorBorder);
+}
+
+.settings-hint {
+    max-width: 800px;
+    margin: 16px 0 0;
+    padding: 10px 14px;
+    color: var(--vscode-descriptionForeground);
+}
+
+.settings-hint button.link {
+    padding: 0;
+}
+
+/* The User and Workspace tabs of the settings view, like those of the Settings editor. */
+.details-header.tabs {
+    justify-content: space-between;
+    gap: 0;
+    padding: 10px 24px 0;
+    border-bottom: 1px solid var(--vscode-settings-headerBorder, var(--vscode-panel-border, transparent));
+}
+
+button.tab {
+    padding: 4px 10px 6px;
+    color: var(--vscode-panelTitle-inactiveForeground);
+    background: none;
+    border: none;
+    border-bottom: 1px solid transparent;
+}
+
+button.tab:hover {
+    color: var(--vscode-panelTitle-activeForeground);
+    background: none;
+}
+
+button.tab.selected {
+    color: var(--vscode-panelTitle-activeForeground);
+    border-bottom-color: var(--vscode-panelTitle-activeBorder);
+}
+
+.group-title {
+    max-width: 800px;
+    margin: 20px 0 4px;
+    padding: 0 14px;
+    font-size: 1.4em;
+    font-weight: 600;
 }

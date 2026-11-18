@@ -1,12 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { TraceMessage } from "@/tcf/channel";
-import { DEFAULT_TRACE_SILENCE, TraceSilenceRule, isSilenced, parseTraceSilence } from "@/tcf/traceSilence";
+import { TraceSilenceRule, isSilenced, parseTraceSilence } from "@/tcf/traceSilence";
 
 // The default keeps the trace to the debugger's own traffic: no heartbeats or
-// other peer events, and nothing from the Simics console.
-test("the default silences Locator peer events and the CommandLine service", () => {
-    const silenced = (message: TraceMessage) => isSilenced(DEFAULT_TRACE_SILENCE, message);
+// other peer events, nothing from the Simics console and no Simics log events.
+test("the default silences Locator peer events, CommandLine and SimicsLogs events", () => {
+    const { rules } = parseTraceSilence(undefined);
+    const silenced = (message: TraceMessage) => isSilenced(rules, message);
     for (const name of ["peerHeartBeat", "peerAdded", "peerRemoved", "peerChanged"]) {
         assert.equal(silenced({ type: "event", service: "Locator", name }), true, name);
     }
@@ -14,6 +15,8 @@ test("the default silences Locator peer events and the CommandLine service", () 
     assert.equal(silenced({ type: "command", service: "CommandLine", name: "keyPressed" }), true);
     assert.equal(silenced({ type: "command", service: "CommandLine", name: "connect" }), true);
     assert.equal(silenced({ type: "event", service: "CommandLine", name: "write" }), true);
+    assert.equal(silenced({ type: "event", service: "SimicsLogs", name: "message" }), true);
+    assert.equal(silenced({ type: "command", service: "SimicsLogs", name: "subscribe" }), false);
     assert.equal(silenced({ type: "command", service: "Breakpoints", name: "add" }), false);
     assert.equal(silenced({ type: "event", service: "RunControl", name: "contextSuspended" }), false);
     assert.equal(silenced({ type: "flowControl" }), false);
@@ -46,20 +49,30 @@ test("flow control is only silenced with * for service and name", () => {
     assert.equal(isSilenced([{ service: "*", type: ["event"] }], flowControl), false);
 });
 
-// Not set means the default, an empty list logs everything, and entries that
+// Not set means the default, an empty list logs everything, and items that
 // are not rules are returned so the session can report them.
-test("parseTraceSilence uses the default only when not set", () => {
-    assert.deepEqual(parseTraceSilence(undefined), { rules: DEFAULT_TRACE_SILENCE, invalid: [] });
+test("parseTraceSilence reads service/type/name rules", () => {
+    assert.deepEqual(parseTraceSilence(undefined), {
+        rules: [
+            { service: "Locator", type: ["event"], name: "peerHeartBeat" },
+            { service: "Locator", type: ["event"], name: "peerAdded" },
+            { service: "Locator", type: ["event"], name: "peerRemoved" },
+            { service: "Locator", type: ["event"], name: "peerChanged" },
+            { service: "CommandLine" },
+            { service: "SimicsLogs", type: ["event"] },
+        ],
+        invalid: [],
+    });
     assert.deepEqual(parseTraceSilence([]), { rules: [], invalid: [] });
-    const rule = { service: "Memory", type: ["command"], name: "get" };
-    const invalid = [
-        { name: "get" },
-        "Memory",
-        { service: "Memory", name: 1 },
-        { service: "Memory", type: "event" },
-        { service: "Memory", type: [] },
-        { service: "Memory", type: ["result"] },
-    ];
-    assert.deepEqual(parseTraceSilence([rule, ...invalid]), { rules: [rule], invalid });
-    assert.deepEqual(parseTraceSilence(rule), { rules: [rule], invalid: [] });
+    assert.deepEqual(parseTraceSilence(["Memory/command,event/get", "*/flowControl", "RunControl/*"]), {
+        rules: [
+            { service: "Memory", type: ["command", "event"], name: "get" },
+            { service: "*", type: ["flowControl"] },
+            { service: "RunControl", type: ["*"] },
+        ],
+        invalid: [],
+    });
+    const invalid = ["", "/event", "Memory/", "Memory/result", "Memory/event/", "a/event/b/c", "Memory/*,event", 1];
+    assert.deepEqual(parseTraceSilence(invalid), { rules: [], invalid });
+    assert.deepEqual(parseTraceSilence("Memory"), { rules: [{ service: "Memory" }], invalid: [] });
 });

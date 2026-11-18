@@ -26,8 +26,9 @@ import {
 } from "./symbolFiles";
 import { suggestSymbolPaths } from "./symbolPath";
 import { registerConsolesView } from "./consolesView";
-import { CONSOLE_AVAILABLE_EVENT, simicsCliOptions } from "./simicsConsole";
+import { CONSOLE_AVAILABLE_EVENT } from "./simicsConsole";
 import { SimicsConsoleManager } from "./simicsConsoleManager";
+import { consoleSettings, registerSilenceCompletions, sessionSettings } from "./settings";
 import {
     ContextSessionManager,
     activeRootSession,
@@ -57,6 +58,7 @@ export function activate(context: vscode.ExtensionContext): void {
     context.subscriptions.push(
         tcfLog,
         contextSessions,
+        registerSilenceCompletions(),
         vscode.debug.registerDebugConfigurationProvider(DEBUG_TYPE, new TcfConfigurationProvider()),
         vscode.debug.registerDebugAdapterDescriptorFactory(DEBUG_TYPE, {
             createDebugAdapterDescriptor: (session) => {
@@ -101,7 +103,7 @@ export function activate(context: vscode.ExtensionContext): void {
                 void sourceLocator.sourceNotFound(event.session, event.body as MissingSource);
             }
             if (event.session.type === DEBUG_TYPE && event.event === CONSOLE_AVAILABLE_EVENT) {
-                consoles.available(event.session, (event.body as { open?: unknown } | undefined)?.open !== false);
+                consoles.available(event.session);
             }
         }),
         consoles,
@@ -141,6 +143,9 @@ export function activate(context: vscode.ExtensionContext): void {
             changeSymbolFiles("reloadSymbolFiles"),
         ),
         vscode.commands.registerCommand("simics-target-debug.saveSymbolFiles", saveSymbolFiles),
+        vscode.commands.registerCommand("simics-target-debug.openSettings", () =>
+            vscode.commands.executeCommand("workbench.action.openSettings", `@ext:${context.extension.id}`),
+        ),
         symbolFiles,
         new TargetMemoryManager(context, DEBUG_TYPE),
     );
@@ -1079,8 +1084,10 @@ class TcfConfigurationProvider implements vscode.DebugConfigurationProvider {
                 return f;
             });
         }
+        // Settings replace any attributes of the same name in launch.json.
+        Object.assign(config, sessionSettings());
         // The Simics CLI opens in the same panel, so the Debug Console would only flash by.
-        if (simicsCliOptions(config).open) {
+        if (consoleSettings().open) {
             config.internalConsoleOptions = "neverOpen";
         }
         return config;

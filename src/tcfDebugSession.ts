@@ -56,6 +56,17 @@ import { scanMemory } from "./shared/targetMemory/search";
 import * as req from "./tcfRequests";
 import { CONSOLE_AVAILABLE_EVENT } from "./simicsConsole";
 import { CommandLineService } from "./tcf/services/commandLine";
+import { SimUtilsService } from "./tcf/services/simUtils";
+import {
+    DeleteAllSnapshotsResult,
+    SNAPSHOTS_CHANGED_EVENT,
+    SnapshotArgs,
+    SnapshotRequest,
+    Snapshots,
+    SnapshotsResult,
+    TakeSnapshotArgs,
+    TakeSnapshotResult,
+} from "./snapshots";
 
 /**
  * The launch configuration attributes, and the extension's settings that the
@@ -252,6 +263,7 @@ export class TcfDebugSession extends DebugSession {
     private pathMapper: PathMapper | undefined;
     private symbolsChangedTimer: NodeJS.Timeout | undefined;
     private memoryMap: MemoryMapService | undefined;
+    private snapshots: Snapshots | undefined;
     private symbolFiles: SymbolFile[] = [];
     /**
      * Unique per session, to tell this session's memory map regions from
@@ -481,6 +493,9 @@ export class TcfDebugSession extends DebugSession {
                     "stderr",
                 );
             }
+            const simUtils = channel.hasService(SimUtilsService.NAME) ? new SimUtilsService(channel) : undefined;
+            simUtils?.onSnapshotsChanged(() => this.sendEvent(new Event(SNAPSHOTS_CHANGED_EVENT)));
+            this.snapshots = new Snapshots(simUtils);
 
             const pathMap = parsePathMapConfig(args.pathMap);
             pathMap.errors.forEach((e) => this.log(`${e}\n`, "stderr"));
@@ -533,6 +548,7 @@ export class TcfDebugSession extends DebugSession {
             this.sendEvent(new InitializedEvent());
             this.sendEvent(new Event("symbolFilesChanged"));
             this.sendEvent(new Event("pathMapChanged"));
+            this.sendEvent(new Event(SNAPSHOTS_CHANGED_EVENT));
             this.reportMissingSymbolFiles();
             if (channel.hasService(CommandLineService.NAME)) {
                 this.sendEvent(new Event(CONSOLE_AVAILABLE_EVENT));
@@ -602,6 +618,9 @@ export class TcfDebugSession extends DebugSession {
         args: unknown,
     ): Promise<void> {
         if (await this.memoryRequest(command, response, args)) {
+            return;
+        }
+        if (await this.snapshotRequest(command, response, args)) {
             return;
         }
         if (command === "getSymbolContexts" || command === "getFunctionBreakpointContexts") {
@@ -1204,6 +1223,56 @@ export class TcfDebugSession extends DebugSession {
                 indexedVariables: v.indexedVariables,
             };
         });
+    }
+
+    /** The Snapshots view's requests; it reports errors itself. Returns false for other requests. */
+    private async snapshotRequest(command: string, response: DebugProtocol.Response, args: unknown): Promise<boolean> {
+        const handle = (fn: (snapshots: Snapshots) => Promise<void>) =>
+            this.handle(
+                response,
+                async () => {
+                    if (!this.snapshots || this.disconnecting) {
+                        throw new Error("Not attached to a TCF agent");
+                    }
+                    await fn(this.snapshots);
+                },
+                false,
+            );
+        const name = () => requireString((args as Partial<SnapshotArgs> | undefined)?.name, "name");
+        switch (command) {
+            case SnapshotRequest.List:
+                if (!this.snapshots || this.disconnecting) {
+                    response.body = { supported: false, snapshots: [] } satisfies SnapshotsResult;
+                    this.sendResponse(response);
+                    return true;
+                }
+                await handle(async (snapshots) => {
+                    response.body = (await snapshots.list()) satisfies SnapshotsResult;
+                });
+                return true;
+            case SnapshotRequest.Take:
+                await handle(async (snapshots) => {
+                    const requested = (args as TakeSnapshotArgs | undefined)?.name;
+                    if (requested !== undefined && typeof requested !== "string") {
+                        throw new Error("Invalid name");
+                    }
+                    response.body = { name: await snapshots.take(requested) } satisfies TakeSnapshotResult;
+                });
+                return true;
+            case SnapshotRequest.Restore:
+                await handle((snapshots) => snapshots.restore(name()));
+                return true;
+            case SnapshotRequest.Delete:
+                await handle((snapshots) => snapshots.delete(name()));
+                return true;
+            case SnapshotRequest.DeleteAll:
+                await handle(async (snapshots) => {
+                    response.body = { deleted: await snapshots.deleteAll() } satisfies DeleteAllSnapshotsResult;
+                });
+                return true;
+            default:
+                return false;
+        }
     }
 
     /** Handles the requests of the memory views (see tcfRequests.ts), returns false for others. */

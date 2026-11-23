@@ -36,6 +36,7 @@ and translates DAP requests to TCF commands:
 | disassembly              | `Disassembly.disassemble` in the frame's context    |
 | breakpoints              | `Breakpoints.add` / `change` / `remove`, `status` events, see below |
 | Target Memory (custom requests) | `Memory.get` / `set` / `getChildren` / `getContext`, `memoryChanged` events, search in the adapter, see below |
+| Snapshots view (custom requests) | Simics `SimUtils.getSnapshotIDs` / `takeSnapshot` / `restoreSnapshot` / `deleteSnapshot`, `snapshotsChanged` events, see below |
 
 Register contexts without a readable value (for example Simics register groups)
 are shown as expandable groups. Registers with fields can be expanded to show
@@ -385,6 +386,26 @@ opens in a terminal named **Simics CLI** after attaching. Its options are the
   `debug.focusEditorOnBreak`.
 - Simics log messages are shown in the console. The console's TCF traffic is
   left out of the [TCF trace](#tcf-trace) unless the silence list is changed.
+
+### Snapshots
+
+The **Snapshots** view in the Run and Debug side bar lists the Simics
+in-memory snapshots of the active session's agent, through the snapshot
+commands of the Simics `SimUtils` service.
+
+- **Take Snapshot** (camera button) names the snapshot like the Simics
+  `take-snapshot` command does: `snapshot`, `snapshot1`, `snapshot2`, ...
+- **Take Named Snapshot...** (tag button) asks for the name.
+- The buttons on a snapshot restore or delete it. Deleting asks first.
+- **Delete All Snapshots...** (clear-all button, shown when there are
+  snapshots) deletes every snapshot of the agent, after asking.
+- The commands are also in the Command Palette; there, restore and delete
+  ask which snapshot.
+- The list follows snapshots taken or deleted elsewhere, for example in
+  the Simics CLI.
+- Without the `SimUtils` service or its snapshot commands, such as with
+  other TCF agents or older Simics versions, the view says that snapshots
+  are not available and the take buttons are disabled.
 
 ## Building
 
@@ -769,6 +790,9 @@ on the agent (for example with `add-pathmap-entry`).
   presses, events to VT text (no `vscode` dependency).
 - `src/simicsConsoleManager.ts` – the Simics CLI terminals and their commands.
 - `src/consolesView.ts` – the Consoles view.
+- `src/snapshots.ts` – Simics snapshots in the adapter, and the custom
+  requests of the Snapshots view (no `vscode` dependency).
+- `src/snapshotsView.ts` – the Snapshots view and its commands.
 - `src/launchSettings/` – the TCF Launch Configurations editor: reading and editing
   `launch.json` (`launchJson.ts`), form fields from `package.json`
   (`schema.ts`), the custom editor (`editorProvider.ts`) and the form in its

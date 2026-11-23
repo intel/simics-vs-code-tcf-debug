@@ -18,6 +18,7 @@ import {
 import { MissingSource, SourceLocator } from "./locateSource";
 import { pathMapProblems } from "./pathMapper";
 import { registerPathMapView } from "./pathMapView";
+import { registerSnapshotsView } from "./snapshotsView";
 import {
     ForeignSymbolFile,
     SymbolFileConfig,
@@ -152,6 +153,7 @@ export function activate(context: vscode.ExtensionContext): void {
     registerLaunchSettings(context);
     registerPathMapView(context);
     registerConsolesView(context, [consoles]);
+    registerSnapshotsView(context);
 }
 
 export function deactivate(): void {

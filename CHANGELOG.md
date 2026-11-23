@@ -16,6 +16,11 @@ All notable changes to the Simics Target Debug extension will be documented here
 - **Simics Target Debug: Open Settings** shows the extension's settings in
   the Settings editor. The Consoles view and TCF Launch Configurations have
   a gear button for it.
+- Snapshots view in the Run and Debug side bar: take, restore and delete
+  Simics snapshots, one at a time or all at once. New snapshots get a
+  name of your own, or one picked like `take-snapshot` does. It uses the
+  Simics `SimUtils` service, and is disabled when the agent does not have
+  its snapshot commands.
 
 ### Changed
 

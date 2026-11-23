@@ -229,6 +229,44 @@
                 "title": "Editing keys such as Ctrl+P go to VS Code. Click to send them to Simics (Editing Keys setting)",
                 "category": "Simics Target Debug",
                 "icon": "$(unlock)"
+            },
+            {
+                "command": "simics-target-debug.takeSnapshot",
+                "title": "Take Snapshot",
+                "category": "Simics Target Debug",
+                "icon": "$(device-camera)",
+                "enablement": "simics-target-debug.snapshots == 'supported'"
+            },
+            {
+                "command": "simics-target-debug.takeNamedSnapshot",
+                "title": "Take Named Snapshot...",
+                "category": "Simics Target Debug",
+                "icon": "$(tag)",
+                "enablement": "simics-target-debug.snapshots == 'supported'"
+            },
+            {
+                "command": "simics-target-debug.restoreSnapshot",
+                "title": "Restore Snapshot",
+                "category": "Simics Target Debug",
+                "icon": "$(history)"
+            },
+            {
+                "command": "simics-target-debug.deleteSnapshot",
+                "title": "Delete Snapshot",
+                "category": "Simics Target Debug",
+                "icon": "$(trash)"
+            },
+            {
+                "command": "simics-target-debug.deleteAllSnapshots",
+                "title": "Delete All Snapshots...",
+                "category": "Simics Target Debug",
+                "icon": "$(clear-all)"
+            },
+            {
+                "command": "simics-target-debug.refreshSnapshots",
+                "title": "Refresh Snapshots",
+                "category": "Simics Target Debug",
+                "icon": "$(refresh)"
             }
         ],
         "views": {
@@ -250,6 +288,12 @@
                     "name": "Consoles",
                     "icon": "$(terminal)",
                     "when": "debugType == 'simics-target-debug' || simics-target-debug.hasConsoles"
+                },
+                {
+                    "id": "simics-target-debug.snapshots",
+                    "name": "Snapshots",
+                    "icon": "$(device-camera)",
+                    "when": "debugType == 'simics-target-debug'"
                 }
             ]
         },
@@ -257,6 +301,16 @@
             {
                 "view": "simics-target-debug.consoles",
                 "contents": "No console. The Simics CLI is listed here when the agent has the Simics CommandLine service."
+            },
+            {
+                "view": "simics-target-debug.snapshots",
+                "contents": "No snapshots.",
+                "when": "simics-target-debug.snapshots == 'supported'"
+            },
+            {
+                "view": "simics-target-debug.snapshots",
+                "contents": "Snapshots are not available. They need the Simics TCF agent with the snapshot commands of its SimUtils service.",
+                "when": "simics-target-debug.snapshots == 'unsupported'"
             }
         ],
         "menus": {
@@ -368,6 +422,30 @@
                 {
                     "command": "simics-target-debug.consoleKeysToSimics",
                     "when": "false"
+                },
+                {
+                    "command": "simics-target-debug.takeSnapshot",
+                    "when": "debugType == 'simics-target-debug'"
+                },
+                {
+                    "command": "simics-target-debug.takeNamedSnapshot",
+                    "when": "debugType == 'simics-target-debug'"
+                },
+                {
+                    "command": "simics-target-debug.restoreSnapshot",
+                    "when": "debugType == 'simics-target-debug' && simics-target-debug.snapshots == 'supported'"
+                },
+                {
+                    "command": "simics-target-debug.deleteSnapshot",
+                    "when": "debugType == 'simics-target-debug' && simics-target-debug.snapshots == 'supported'"
+                },
+                {
+                    "command": "simics-target-debug.deleteAllSnapshots",
+                    "when": "debugType == 'simics-target-debug' && simics-target-debug.hasSnapshots"
+                },
+                {
+                    "command": "simics-target-debug.refreshSnapshots",
+                    "when": "debugType == 'simics-target-debug'"
                 }
             ],
             "editor/title": [
@@ -474,6 +552,26 @@
                     "command": "simics-target-debug.reloadSymbolFiles",
                     "when": "view == 'simics-target-debug.symbolFiles'",
                     "group": "navigation@3"
+                },
+                {
+                    "command": "simics-target-debug.takeSnapshot",
+                    "when": "view == 'simics-target-debug.snapshots'",
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "simics-target-debug.takeNamedSnapshot",
+                    "when": "view == 'simics-target-debug.snapshots'",
+                    "group": "navigation@2"
+                },
+                {
+                    "command": "simics-target-debug.deleteAllSnapshots",
+                    "when": "view == 'simics-target-debug.snapshots' && simics-target-debug.hasSnapshots",
+                    "group": "navigation@3"
+                },
+                {
+                    "command": "simics-target-debug.refreshSnapshots",
+                    "when": "view == 'simics-target-debug.snapshots'",
+                    "group": "navigation@4"
                 }
             ],
             "view/item/context": [
@@ -541,6 +639,16 @@
                     "command": "simics-target-debug.removeSymbolFile",
                     "when": "view == 'simics-target-debug.symbolFiles' && viewItem =~ /\\bsymbolFile\\b/",
                     "group": "inline@3"
+                },
+                {
+                    "command": "simics-target-debug.restoreSnapshot",
+                    "when": "view == 'simics-target-debug.snapshots' && viewItem == 'snapshot'",
+                    "group": "inline@1"
+                },
+                {
+                    "command": "simics-target-debug.deleteSnapshot",
+                    "when": "view == 'simics-target-debug.snapshots' && viewItem == 'snapshot'",
+                    "group": "inline@2"
                 }
             ],
             "debug/toolBar": [

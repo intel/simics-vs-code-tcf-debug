@@ -16,5 +16,5 @@
         "sourceMap": true
     },
     "include": ["src", "scripts"],
-    "exclude": ["src/webview", "src/launchSettings/webview"]
+    "exclude": ["src/webview"]
 }

@@ -114,19 +114,19 @@ const contexts = tests
           }),
           // The launch settings form, also writes out/webview/launchSettings.css.
           await esbuild.context({
-              ...common,
+              entryPoints: { launchSettings: "src/webview/launchSettings/index.tsx" },
+              plugins: watchPlugins(),
+              bundle: true,
               format: "iife",
               platform: "browser",
               target: "es2022",
-              plugins: watchPlugins(),
-              entryPoints: [
-                  "src/launchSettings/webview/launchSettings.ts",
-                  "src/launchSettings/webview/launchSettings.css",
-              ],
               outdir: "out/webview",
+              jsx: "automatic",
               loader: { ".ttf": "dataurl" },
+              define: { "process.env.NODE_ENV": JSON.stringify(production ? "production" : "development") },
               sourcemap: !production,
               minify: production,
+              logLevel: "info",
           }),
       ];
 

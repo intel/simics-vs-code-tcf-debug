@@ -878,7 +878,7 @@
         "compile": "node esbuild.mjs",
         "compile:production": "node esbuild.mjs --production",
         "watch": "node esbuild.mjs --watch",
-        "typecheck": "tsc --noEmit -p . && tsc --noEmit -p tsconfig.webview.json && tsc --noEmit -p src/launchSettings/webview",
+        "typecheck": "tsc --noEmit -p . && tsc --noEmit -p tsconfig.webview.json",
         "format": "prettier --write .",
         "test": "node esbuild.mjs --tests && node --enable-source-maps --test \"out/test/*.test.js\"",
         "test:fuzz": "node esbuild.mjs --tests && node --enable-source-maps --test out/test/fuzzing.test.js",

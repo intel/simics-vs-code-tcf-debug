@@ -16,6 +16,17 @@ export interface PathMapRule {
     contextQuery?: string;
 }
 
+/** A rule the agent has that this client did not set. */
+export interface ForeignPathMapRule {
+    source: string;
+    destination: string;
+    contextQuery?: string;
+    id?: string;
+    host?: string;
+    /** False if the rule is for another host, so this client does not use it. */
+    used: boolean;
+}
+
 export interface TargetPath {
     path: string;
     /** Only set when local reverse mapping must be limited to this context. */
@@ -264,6 +275,27 @@ export class PathMapper {
         }
     }
 
+    /**
+     * Rules the agent has that this client did not set, for example ones
+     * added with the Simics command add-pathmap-entry or by other clients.
+     * Read from the agent on each call, and errors are not hidden.
+     */
+    async foreignRules(): Promise<ForeignPathMapRule[]> {
+        if (!this.service) {
+            return [];
+        }
+        return (await this.service.get())
+            .filter((r) => this.isForeignRule(r))
+            .map((r) => ({
+                source: r.Source!,
+                destination: r.Destination!,
+                ...(typeof r.ContextQuery === "string" && r.ContextQuery && { contextQuery: r.ContextQuery }),
+                ...(typeof r.ID === "string" && { id: r.ID }),
+                ...(typeof r.Host === "string" && r.Host && { host: r.Host }),
+                used: !r.Host || isLocalHost(r.Host),
+            }));
+    }
+
     /** Rules the agent knows from elsewhere that apply to this host. */
     private otherAgentRules(): Promise<PathMapRuleProperties[]> {
         if (!this.service) {
@@ -271,19 +303,19 @@ export class PathMapper {
         }
         this.agentRules ??= this.service
             .get()
-            .then((rules) =>
-                rules.filter(
-                    (r) =>
-                        typeof r.Source === "string" &&
-                        r.Source.length > 0 &&
-                        typeof r.Destination === "string" &&
-                        r.Destination.length > 0 &&
-                        !(typeof r.ID === "string" && r.ID.startsWith(this.idPrefix)) &&
-                        (!r.Host || isLocalHost(r.Host)),
-                ),
-            )
+            .then((rules) => rules.filter((r) => this.isForeignRule(r) && (!r.Host || isLocalHost(r.Host))))
             .catch(() => []);
         return this.agentRules;
+    }
+
+    private isForeignRule(r: PathMapRuleProperties): boolean {
+        return (
+            typeof r.Source === "string" &&
+            r.Source.length > 0 &&
+            typeof r.Destination === "string" &&
+            r.Destination.length > 0 &&
+            !(typeof r.ID === "string" && r.ID.startsWith(this.idPrefix))
+        );
     }
 }
 

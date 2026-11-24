@@ -300,6 +300,25 @@ test("toTarget skips the rules this client sent itself", async () => {
     assert.equal(await mapper.toTarget("/elsewhere/a.c"), "/elsewhere/a.c");
 });
 
+// The Path Maps view lists the agent's other rules, also ones for other
+// hosts, but not this client's own or incomplete ones.
+test("foreignRules lists the rules this client did not set", async () => {
+    const agentRules: PathMapRuleProperties[] = [
+        { ID: "simics-1", Source: "/agent", Destination: "/host", ContextQuery: "ID=cpu0" },
+        { Source: "/remote", Destination: "/r", Host: "some-other-host.invalid" },
+        { Source: "/nodest", Destination: "" },
+    ];
+    const fake = fakePathMapService(agentRules);
+    const mapper = new PathMapper([{ source: "/build", destination: "/ws" }], fake.service);
+    await mapper.apply();
+    agentRules.push(...fake.sets[0]);
+    assert.deepEqual(await mapper.foreignRules(), [
+        { id: "simics-1", source: "/agent", destination: "/host", contextQuery: "ID=cpu0", used: true },
+        { source: "/remote", destination: "/r", host: "some-other-host.invalid", used: false },
+    ]);
+    await assert.rejects(new PathMapper([], fakePathMapService(new Error("failed")).service).foreignRules());
+});
+
 // The common tail of the two paths is dropped, so the rule also maps the
 // other files of the source tree.
 test("deriveRule maps the differing directory prefixes", () => {

@@ -6,15 +6,7 @@
  */
 
 export type FieldKind =
-    | "string"
-    | "enum"
-    | "multiEnum"
-    | "number"
-    | "integer"
-    | "boolean"
-    | "stringOrInteger"
-    | "objectList"
-    | "unsupported";
+    "string" | "enum" | "number" | "integer" | "boolean" | "stringOrInteger" | "objectList" | "unsupported";
 
 export interface Field {
     key: string;
@@ -25,16 +17,12 @@ export interface Field {
     description?: string;
     default?: unknown;
     required?: boolean;
-    /** Allowed values of an 'enum' field, or of the items of a 'multiEnum' field. */
+    /** Allowed values of an 'enum' field. */
     values?: string[];
     /** Text to show for each of `values`, if not the values themselves. */
     valueLabels?: string[];
     /** The properties of the objects in an 'objectList' field. */
     columns?: Field[];
-    /** The item an 'objectList' field gets when one is added, from the "default" of its items. */
-    newItem?: Record<string, unknown>;
-    /** Values a 'string' field offers in a dropdown, from "examples". Other text is allowed too. */
-    suggestions?: string[];
     /**
      * What a path field may be set to with Browse buttons, from "format" in
      * package.json: "file-path" or "file-or-folder-path". The latter is a
@@ -158,59 +146,6 @@ export function valueAtPath(values: unknown, path: readonly (string | number)[])
 export type ParsedInput = { value: unknown } | { remove: true } | { error: string };
 
 /**
- * A copy of `rows` with `value` at `path` (an item index, then optionally an
- * item property), or without it if `value` is undefined. Index -1 appends.
- */
-export function editList(rows: readonly unknown[], path: readonly (string | number)[], value: unknown): unknown[] {
-    const copy = rows.map((r) => (isObject(r) ? { ...r } : r));
-    const [index, key] = path;
-    if (typeof index !== "number") {
-        return copy;
-    }
-    if (key === undefined) {
-        if (value === undefined) {
-            copy.splice(index, 1);
-        } else if (index === -1) {
-            copy.push(value);
-        } else {
-            copy[index] = value;
-        }
-    } else {
-        const row = copy[index];
-        if (isObject(row)) {
-            if (value === undefined) {
-                delete row[key];
-            } else {
-                row[key] = value;
-            }
-        }
-    }
-    return copy;
-}
-
-/**
- * The choices of a 'multiEnum' field after `value` is checked or unchecked, in
- * the order of `values`. "*" (all) excludes the others. The last choice cannot
- * be unchecked.
- */
-export function toggleChoice(
-    values: readonly string[],
-    selected: readonly string[],
-    value: string,
-    on: boolean,
-): string[] {
-    if (!on) {
-        const rest = selected.filter((v) => v !== value);
-        return rest.length > 0 ? rest : [...selected];
-    }
-    if (value === "*") {
-        return ["*"];
-    }
-    const next = new Set([...selected.filter((v) => v !== "*"), value]);
-    return values.filter((v) => next.has(v));
-}
-
-/**
  * Converts the text typed into a field to the value to store. An empty text
  * removes the attribute, so its default applies.
  */
@@ -237,22 +172,6 @@ export function parseInput(kind: FieldKind, text: string): ParsedInput {
     }
 }
 
-/**
- * The suggestions that contain `text`, ignoring case, those starting with it
- * first. All of them for an empty text.
- */
-export function filterSuggestions(suggestions: readonly string[], text: string): string[] {
-    const t = text.trim().toLowerCase();
-    if (t.length === 0) {
-        return [...suggestions];
-    }
-    const matching = suggestions.filter((s) => s.toLowerCase().includes(t));
-    return [
-        ...matching.filter((s) => s.toLowerCase().startsWith(t)),
-        ...matching.filter((s) => !s.toLowerCase().startsWith(t)),
-    ];
-}
-
 /** "connectTimeout" -> "Connect Timeout", "traceTcf" -> "Trace TCF". */
 export function labelFor(key: string): string {
     return key
@@ -272,8 +191,6 @@ interface Schema {
     markdownDescription?: unknown;
     default?: unknown;
     enum?: unknown;
-    enumItemLabels?: unknown;
-    examples?: unknown;
     format?: unknown;
     items?: unknown;
     properties?: unknown;
@@ -297,34 +214,16 @@ function field(key: string, schema: Schema, required: boolean): Field {
     if (f.kind === "string" && schema.format === "file-or-folder-path") {
         f.browse = "fileOrFolder";
     }
-    if (f.kind === "string" && Array.isArray(schema.examples)) {
-        f.suggestions = schema.examples.map(String);
-    }
     if (f.kind === "enum") {
         f.values = (schema.enum as unknown[]).map(String);
-        f.valueLabels = itemLabels(schema, f.values);
-    }
-    if (f.kind === "multiEnum") {
-        const items = schema.items as Schema;
-        f.values = (items.enum as unknown[]).map(String);
-        f.valueLabels = itemLabels(items, f.values);
     }
     if (f.kind === "objectList") {
         const items = schema.items as Schema;
         f.columns = fieldsFromSchema(items.properties as Record<string, unknown>, items.required);
-        if (isObject(items.default)) {
-            f.newItem = items.default;
-        }
         // A list default in package.json is only a completion template.
         delete f.default;
     }
     return f;
-}
-
-/** The "enumItemLabels" of an enum schema, if there is one label for each value. */
-function itemLabels(schema: Schema, values: string[]): string[] | undefined {
-    const labels = schema.enumItemLabels;
-    return Array.isArray(labels) && labels.length === values.length ? labels.map(String) : undefined;
 }
 
 function kindOf(schema: Schema): FieldKind {
@@ -339,9 +238,6 @@ function kindOf(schema: Schema): FieldKind {
                 return types[0] as FieldKind;
             case "array": {
                 const items = isObject(schema.items) ? (schema.items as Schema) : undefined;
-                if (items?.type === "string" && Array.isArray(items.enum)) {
-                    return "multiEnum";
-                }
                 if (
                     items?.type === "object" &&
                     isObject(items.properties) &&
@@ -359,15 +255,7 @@ function kindOf(schema: Schema): FieldKind {
     return "unsupported";
 }
 
-const SIMPLE_KINDS = new Set<FieldKind>([
-    "string",
-    "enum",
-    "multiEnum",
-    "number",
-    "integer",
-    "boolean",
-    "stringOrInteger",
-]);
+const SIMPLE_KINDS = new Set<FieldKind>(["string", "enum", "number", "integer", "boolean", "stringOrInteger"]);
 
 interface DebuggerContribution {
     type?: unknown;

@@ -1,13 +1,6 @@
 import * as React from "react";
 import type { JsonPath } from "@/launchSettings/protocol";
-import {
-    type Field,
-    type FieldKind,
-    fieldPath,
-    filterSuggestions,
-    parseInput,
-    toggleChoice,
-} from "@/launchSettings/schema";
+import { type Field, type FieldKind, fieldPath, parseInput } from "@/launchSettings/schema";
 
 /*
  * The inputs of the launch configurations form, laid out like the Settings
@@ -110,8 +103,6 @@ export function Control({ field, value, edit }: { field: Field; value: unknown; 
             return <TextInput field={field} value={value} path={path} edit={edit} />;
         case "enum":
             return <EnumInput field={field} value={value} path={path} edit={edit} />;
-        case "multiEnum":
-            return <MultiSelect field={field} value={value} path={path} edit={edit} />;
         case "boolean":
             return <Checkbox field={field} value={value} path={path} edit={edit} />;
         case "objectList":
@@ -135,8 +126,7 @@ interface InputProps {
 /**
  * A text box that writes its value when it loses focus or Enter is pressed.
  * Empty text removes the attribute, unless `emptyError` says it may not be
- * empty. With suggestions, typing or the arrow button shows the matching
- * ones below it; any other text can still be typed.
+ * empty.
  */
 export function TextInput({ field, value, path, edit, emptyError }: InputProps & { emptyError?: string }) {
     const shown = value === undefined ? "" : typeof value === "object" ? JSON.stringify(value) : String(value);
@@ -177,11 +167,6 @@ export function TextInput({ field, value, path, edit, emptyError }: InputProps &
         }
     };
 
-    const combo = useCombo(field.suggestions, (s) => {
-        setText(s);
-        write(s);
-    });
-
     // Native dialogs on Linux and Windows cannot offer files and folders at once, hence two buttons.
     const buttons =
         field.browse === "file" ? (
@@ -216,24 +201,13 @@ export function TextInput({ field, value, path, edit, emptyError }: InputProps &
             spellCheck={false}
             aria-label={field.label}
             data-focus={focusKey(path)}
-            {...combo?.inputProps}
-            onChange={(e) => {
-                setText(e.target.value);
-                combo?.typed(e.target.value);
-            }}
+            onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => {
-                if (combo?.keyDown(e)) {
-                    return;
-                }
                 if (e.key === "Enter") {
-                    const t = combo?.active ?? text;
-                    combo?.close();
-                    setText(t);
-                    write(t);
+                    write(text);
                 }
             }}
             onBlur={() => {
-                combo?.close();
                 if (text === shown) {
                     setError(undefined);
                 } else if (text !== written.current) {
@@ -242,25 +216,15 @@ export function TextInput({ field, value, path, edit, emptyError }: InputProps &
             }}
         />
     );
-    const row =
-        combo || buttons ? (
-            <div className="input-row">
-                {box}
-                {combo?.button}
-                {buttons}
-            </div>
-        ) : (
-            box
-        );
     return (
         <div className={problem ? "input problem" : "input"}>
-            {combo ? (
-                <div className="combo">
-                    {row}
-                    {combo.list}
+            {buttons ? (
+                <div className="input-row">
+                    {box}
+                    {buttons}
                 </div>
             ) : (
-                row
+                box
             )}
             <div className="validation" hidden={error === undefined}>
                 {error}
@@ -268,110 +232,6 @@ export function TextInput({ field, value, path, edit, emptyError }: InputProps &
             {problem && <div className="validation problem-text">{problem}</div>}
         </div>
     );
-}
-
-/** The suggestion list of a text box, undefined without suggestions. */
-function useCombo(suggestions: readonly string[] | undefined, pick: (s: string) => void) {
-    const id = React.useId();
-    const [shown, setShown] = React.useState<string[]>();
-    const [active, setActive] = React.useState(-1);
-    const list = React.useRef<HTMLUListElement>(null);
-    React.useEffect(() => {
-        list.current?.children[active]?.scrollIntoView({ block: "nearest" });
-    }, [active]);
-    if (!suggestions) {
-        return undefined;
-    }
-    const open = (text: string) => {
-        const matches = filterSuggestions(suggestions, text);
-        setShown(matches.length > 0 ? matches : undefined);
-        setActive(-1);
-        return matches;
-    };
-    const close = () => {
-        setShown(undefined);
-        setActive(-1);
-    };
-    /** Handles the keys for the list, true if the text box should do nothing else. */
-    const keyDown = (e: React.KeyboardEvent): boolean => {
-        if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-            e.preventDefault();
-            const matches = shown ?? open("");
-            const down = e.key === "ArrowDown";
-            const from = shown ? active : -1;
-            if (matches.length > 0) {
-                setActive(
-                    from < 0
-                        ? down
-                            ? 0
-                            : matches.length - 1
-                        : (from + (down ? 1 : -1) + matches.length) % matches.length,
-                );
-            }
-            return true;
-        }
-        if (e.key === "Escape" && shown) {
-            e.preventDefault();
-            e.stopPropagation();
-            close();
-            return true;
-        }
-        return false;
-    };
-    return {
-        inputProps: {
-            role: "combobox",
-            "aria-autocomplete": "list" as const,
-            "aria-controls": id,
-            "aria-expanded": shown !== undefined,
-            "aria-activedescendant": shown && active >= 0 ? `${id}-${active}` : undefined,
-        },
-        /** The highlighted suggestion, which Enter picks. */
-        active: shown && active >= 0 ? shown[active] : undefined,
-        typed: open,
-        keyDown,
-        close,
-        button: (
-            <button
-                className="icon combo-button"
-                tabIndex={-1}
-                title="Show suggestions"
-                aria-label="Show suggestions"
-                // Keeps the focus in the text box, so it does not write the typed text first.
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={(e) => {
-                    if (shown) {
-                        close();
-                    } else {
-                        (e.currentTarget.parentElement?.querySelector("input") as HTMLInputElement | null)?.focus();
-                        open("");
-                    }
-                }}
-            >
-                <span className="codicon codicon-chevron-down" aria-hidden="true" />
-            </button>
-        ),
-        list: (
-            <ul ref={list} className="combo-list" id={id} role="listbox" hidden={shown === undefined}>
-                {shown?.map((s, i) => (
-                    <li
-                        key={s}
-                        id={`${id}-${i}`}
-                        role="option"
-                        aria-selected={i === active}
-                        className={i === active ? "combo-option active" : "combo-option"}
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => {
-                            close();
-                            pick(s);
-                        }}
-                    >
-                        {s}
-                    </li>
-                ))}
-            </ul>
-        ),
-    };
 }
 
 function EnumInput({ field, value, path, edit }: InputProps) {
@@ -413,10 +273,7 @@ function Checkbox({ field, value, path, edit }: InputProps) {
 function ObjectList({ field, value, edit }: { field: Field; value: unknown[] | undefined; edit: Editor }) {
     const rows = value ?? [];
     const columns = field.columns ?? [];
-    const newRow = {
-        ...Object.fromEntries(columns.filter((c) => c.required).map((c) => [c.key, ""])),
-        ...field.newItem,
-    };
+    const newRow = Object.fromEntries(columns.filter((c) => c.required).map((c) => [c.key, ""]));
     // Focus the new row, so its empty cells are not marked before the user had a chance to fill them.
     const addItem = () => {
         if (columns.length > 0) {
@@ -486,76 +343,9 @@ function Cell(props: InputProps) {
             return <Checkbox {...props} field={{ ...props.field, description: "" }} />;
         case "enum":
             return <EnumInput {...props} />;
-        case "multiEnum":
-            return <MultiSelect {...props} />;
         default:
             return <TextInput {...props} />;
     }
-}
-
-/** A dropdown with a checkbox for each value. Without a value, the default is checked. */
-function MultiSelect({ field, value, path, edit }: InputProps) {
-    const [open, setOpen] = React.useState(false);
-    const details = React.useRef<HTMLDetailsElement>(null);
-    // Closes on a click anywhere else.
-    React.useEffect(() => {
-        if (!open) {
-            return undefined;
-        }
-        const click = (e: MouseEvent) => {
-            if (!details.current?.contains(e.target as Node)) {
-                setOpen(false);
-            }
-        };
-        document.addEventListener("click", click);
-        return () => document.removeEventListener("click", click);
-    }, [open]);
-    const values = field.values ?? [];
-    const current = Array.isArray(value) ? value : Array.isArray(field.default) ? field.default : [];
-    const selected = current.map(String);
-    const label = (v: string) => field.valueLabels?.[values.indexOf(v)] ?? v;
-    const text = selected.map(label).join(", ");
-    return (
-        <details
-            ref={details}
-            className="multi-select"
-            open={open}
-            onToggle={(e) => setOpen(e.currentTarget.open)}
-            onKeyDown={(e) => {
-                if (e.key === "Escape" && open) {
-                    setOpen(false);
-                    details.current?.querySelector("summary")?.focus();
-                }
-            }}
-        >
-            <summary
-                aria-label={field.label}
-                data-focus={focusKey(path)}
-                className={Array.isArray(value) ? "" : "default"}
-            >
-                <span className="multi-select-text" title={text}>
-                    {text}
-                </span>
-                <span className="codicon codicon-chevron-down" aria-hidden="true" />
-            </summary>
-            <div className="multi-select-options">
-                {values.map((v) => {
-                    const checked = selected.includes(v);
-                    return (
-                        <label key={v} className="multi-select-option">
-                            <input
-                                type="checkbox"
-                                checked={checked}
-                                disabled={checked && selected.length === 1}
-                                onChange={(e) => edit.set(path, toggleChoice(values, selected, v, e.target.checked))}
-                            />
-                            <span>{label(v)}</span>
-                        </label>
-                    );
-                })}
-            </div>
-        </details>
-    );
 }
 
 export function Unsupported({ value, edit }: { value: unknown; edit: Editor }) {

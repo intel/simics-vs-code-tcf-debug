@@ -4,15 +4,12 @@ import * as fs from "fs";
 import * as path from "path";
 import {
     agentAddress,
-    editList,
     fieldPath,
     fieldsFromSchema,
-    filterSuggestions,
     labelFor,
     launchFields,
     launchTemplate,
     parseInput,
-    toggleChoice,
     valueAtPath,
 } from "@/launchSettings/schema";
 import { DEFAULT_TRACE_SILENCE } from "@/tcf/traceSilence";
@@ -61,18 +58,6 @@ test("launchFields reads the simics-target-debug attributes from package.json", 
             ["absolute", "boolean", undefined],
         ],
     );
-    assert.equal(pathMap?.newItem, undefined);
-});
-
-// Typed text matches anywhere, ignoring case, with matches at the start first.
-test("filterSuggestions keeps matching suggestions, prefix matches first", () => {
-    const services = ["*", "Memory", "MemoryMap", "PathMap", "Symbols"];
-    assert.deepEqual(filterSuggestions(services, ""), services);
-    assert.deepEqual(filterSuggestions(services, "map"), ["MemoryMap", "PathMap"]);
-    assert.deepEqual(filterSuggestions(services, "m"), ["Memory", "MemoryMap", "PathMap", "Symbols"]);
-    assert.deepEqual(filterSuggestions(services, "MEM"), ["Memory", "MemoryMap"]);
-    assert.deepEqual(filterSuggestions(services, "*"), ["*"]);
-    assert.deepEqual(filterSuggestions(services, "xyz"), []);
 });
 
 // The session uses DEFAULT_TRACE_SILENCE when it gets no setting, and the
@@ -87,30 +72,6 @@ test("list defaults in package.json are the ones that apply", () => {
     assert.deepEqual(silence.default, DEFAULT_TRACE_SILENCE);
     const fields = launchFields(PACKAGE_JSON, "simics-target-debug");
     assert.equal(fields.find((f) => f.key === "pathMap")?.default, undefined);
-});
-
-// Editing a list that is not set starts from its default items.
-test("editList changes, adds and removes items and properties", () => {
-    const rows = [{ service: "Locator", name: "peerHeartBeat" }, { service: "CommandLine" }];
-    assert.deepEqual(editList(rows, [1, "name"], "connect"), [
-        { service: "Locator", name: "peerHeartBeat" },
-        { service: "CommandLine", name: "connect" },
-    ]);
-    assert.deepEqual(editList(rows, [0, "name"], undefined), [{ service: "Locator" }, { service: "CommandLine" }]);
-    assert.deepEqual(editList(rows, [0], undefined), [{ service: "CommandLine" }]);
-    assert.deepEqual(editList(rows, [-1], { service: "" }), [...rows, { service: "" }]);
-    assert.deepEqual(rows, [{ service: "Locator", name: "peerHeartBeat" }, { service: "CommandLine" }]);
-});
-
-// "*" (all) and the other choices exclude each other, choices keep the order
-// of the values, and the last choice stays checked.
-test("toggleChoice keeps * alone and at least one choice", () => {
-    const values = ["*", "command", "event", "flowControl"];
-    assert.deepEqual(toggleChoice(values, ["*"], "event", true), ["event"]);
-    assert.deepEqual(toggleChoice(values, ["event"], "command", true), ["command", "event"]);
-    assert.deepEqual(toggleChoice(values, ["command", "event"], "*", true), ["*"]);
-    assert.deepEqual(toggleChoice(values, ["command", "event"], "command", false), ["event"]);
-    assert.deepEqual(toggleChoice(values, ["event"], "event", false), ["event"]);
 });
 
 // A new attribute in package.json must get a real input, not the

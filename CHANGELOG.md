@@ -21,6 +21,9 @@ All notable changes to the Simics Target Debug extension will be documented here
   name of your own, or one picked like `take-snapshot` does. It uses the
   Simics `SimUtils` service, and is disabled when the agent does not have
   its snapshot commands.
+- The Path Maps view lists the agent's rules from elsewhere, for example
+  added with `add-pathmap-entry` in Simics, read-only under
+  **Added Elsewhere**, like the Symbol Files view does.
 
 ### Changed
 

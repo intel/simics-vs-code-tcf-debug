@@ -665,6 +665,18 @@ export class TcfDebugSession extends DebugSession {
             this.sendResponse(response);
             return;
         }
+        if (command === "getForeignPathMapRules") {
+            await this.handle(
+                response,
+                async () => {
+                    response.body = {
+                        rules: this.pathMapper && !this.disconnecting ? await this.pathMapper.foreignRules() : [],
+                    };
+                },
+                false,
+            );
+            return;
+        }
         if (command === "setPathMapRules") {
             await this.handle(response, async () => {
                 const input = args as

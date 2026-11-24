@@ -2,7 +2,7 @@ import * as path from "path";
 import * as vscode from "vscode";
 import { activeRootSession } from "./contextSessionManager";
 import { savePathMapRules, withWorkspaceFolder } from "./locateSource";
-import { PathMapRule, pathMapContextQuery } from "./pathMapper";
+import { ForeignPathMapRule, PathMapRule, pathMapContextQuery } from "./pathMapper";
 import { promptPathMapScope } from "./pathMapScope";
 
 const VIEW = "simics-target-debug.pathMap";
@@ -29,6 +29,49 @@ class PathMapItem extends vscode.TreeItem {
     }
 }
 
+class ForeignPathMapItem extends vscode.TreeItem {
+    override readonly contextValue = "foreignPathMapRule";
+
+    constructor(rule: ForeignPathMapRule) {
+        super(rule.source);
+        const scope = rule.contextQuery ?? "all contexts";
+        this.description = `${rule.destination} (${scope}${rule.used ? "" : `, host ${rule.host}`})`;
+        this.tooltip = [
+            rule.source,
+            `To: ${rule.destination}`,
+            `Scope: ${scope}`,
+            rule.host && `Host: ${rule.host}`,
+            rule.id && `ID: ${rule.id}`,
+            !rule.used && "Not used, the rule is for another host",
+        ]
+            .filter(Boolean)
+            .join("\n");
+        this.iconPath = new vscode.ThemeIcon("replace-all");
+    }
+}
+
+/** Read-only rules the agent has that the session did not add. */
+class ForeignPathMapRulesItem extends vscode.TreeItem {
+    constructor(readonly children: vscode.TreeItem[]) {
+        super("Added Elsewhere", vscode.TreeItemCollapsibleState.Expanded);
+        this.id = "foreignPathMapRules";
+        this.contextValue = "foreignPathMapRules";
+        this.tooltip =
+            "Path map rules the agent has that this session did not add, for example with " +
+            "add-pathmap-entry in Simics or by another client";
+        this.iconPath = new vscode.ThemeIcon("references");
+    }
+}
+
+async function foreignRuleItems(session: vscode.DebugSession): Promise<vscode.TreeItem[]> {
+    try {
+        const { rules } = (await session.customRequest("getForeignPathMapRules")) as { rules: ForeignPathMapRule[] };
+        return rules.map((rule) => new ForeignPathMapItem(rule));
+    } catch (err) {
+        return [new vscode.TreeItem(`Could not read the agent's path map: ${errorMessage(err)}`)];
+    }
+}
+
 class PathMapProvider implements vscode.TreeDataProvider<vscode.TreeItem>, vscode.Disposable {
     private readonly changes = new vscode.EventEmitter<void>();
     readonly onDidChangeTreeData = this.changes.event;
@@ -41,19 +84,26 @@ class PathMapProvider implements vscode.TreeDataProvider<vscode.TreeItem>, vscod
         return item;
     }
 
-    async getChildren(): Promise<vscode.TreeItem[]> {
+    async getChildren(element?: vscode.TreeItem): Promise<vscode.TreeItem[]> {
+        if (element instanceof ForeignPathMapRulesItem) {
+            return element.children;
+        }
         const session = activeRootSession();
         if (session?.type !== DEBUG_TYPE) {
             return [];
         }
         try {
-            const rules = await getRules(session);
+            const [rules, foreignRules] = await Promise.all([getRules(session), foreignRuleItems(session)]);
             if (session !== activeRootSession()) {
                 return [];
             }
-            return rules.length
+            const items: vscode.TreeItem[] = rules.length
                 ? rules.map((rule, i) => new PathMapItem(rule, i, session))
                 : [new vscode.TreeItem("No session path map rules")];
+            if (foreignRules.length > 0) {
+                items.push(new ForeignPathMapRulesItem(foreignRules));
+            }
+            return items;
         } catch (err) {
             return [new vscode.TreeItem(`Could not load path map: ${errorMessage(err)}`)];
         }

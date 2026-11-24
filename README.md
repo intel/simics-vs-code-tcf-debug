@@ -758,8 +758,11 @@ in the current session's named configuration in `.vscode/launch.json` after
 confirmation, including scopes, removals and ordering. Workspace destinations are
 saved using `${workspaceFolder}`. Saving requires a workspace launch
 configuration with a unique name; session-only changes do not modify it.
-The view manages this debug client's rules, not rules installed separately
-on the agent (for example with `add-pathmap-entry`).
+The view manages this debug client's rules. Rules the agent has from
+elsewhere, for example added with `add-pathmap-entry` in Simics or by another
+client, are listed read-only under **Added Elsewhere**, read with
+`PathMap.get`. Rules for another host are listed too, but are not used. The
+view is refreshed when the agent reports that its path map changed.
 
 ## Source layout
 

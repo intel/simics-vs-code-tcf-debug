@@ -1,6 +1,14 @@
 import * as React from "react";
 import type { JsonPath } from "@/launchSettings/protocol";
-import { type Field, type FieldKind, fieldPath, parseInput } from "@/launchSettings/schema";
+import { type ContextScope, parseContextList } from "@/contextChoices";
+import {
+    type Field,
+    type FieldKind,
+    fieldPath,
+    parseInput,
+    readContextScope,
+    withContextScope,
+} from "@/launchSettings/schema";
 
 /*
  * The inputs of the launch configurations form, laid out like the Settings
@@ -16,6 +24,10 @@ export interface Editor {
     isMissing(path: JsonPath): boolean;
     /** Opens launch.json as text, for values the form cannot edit. */
     openText(): void;
+    /** Picks the contexts of the list item at `path` from the running session. */
+    pickContexts(path: JsonPath): void;
+    /** True if a session runs to the configuration's agent, so that pickContexts can list its contexts. */
+    canPickContexts: boolean;
 }
 
 /** The data-focus key of a control to focus when the next state is shown. */
@@ -315,12 +327,20 @@ function ObjectList({ field, value, edit }: { field: Field; value: unknown[] | u
                                 ) : (
                                     columns.map((c) => (
                                         <td key={c.key}>
-                                            <Cell
-                                                field={c}
-                                                value={(row as Record<string, unknown>)[c.key]}
-                                                path={[field.key, r, c.key]}
-                                                edit={edit}
-                                            />
+                                            {c.kind === "contextScope" ? (
+                                                <ContextScopeCell
+                                                    item={row as Record<string, unknown>}
+                                                    path={[field.key, r]}
+                                                    edit={edit}
+                                                />
+                                            ) : (
+                                                <Cell
+                                                    field={c}
+                                                    value={(row as Record<string, unknown>)[c.key]}
+                                                    path={[field.key, r, c.key]}
+                                                    edit={edit}
+                                                />
+                                            )}
                                         </td>
                                     ))
                                 )}
@@ -346,6 +366,83 @@ function Cell(props: InputProps) {
         default:
             return <TextInput {...props} />;
     }
+}
+
+type ScopeMode = "all" | "contexts" | "query";
+
+const CONTEXTS_INPUT: Field = {
+    key: "contexts",
+    label: "Contexts",
+    kind: "string",
+    default: "IDs or names, separated by commas",
+};
+const QUERY_INPUT: Field = { key: "contextQuery", label: "Context Query", kind: "string" };
+
+/**
+ * The contexts of a list item: all, listed IDs or names, or a context query.
+ * Each change writes the whole item, so that the attributes of the other
+ * choices are removed at the same time.
+ */
+function ContextScopeCell({ item, path, edit }: { item: Record<string, unknown>; path: JsonPath; edit: Editor }) {
+    const scope = readContextScope(item);
+    const saved: ScopeMode = "contextQuery" in scope ? "query" : scope.contexts.length > 0 ? "contexts" : "all";
+    /** The choice made while nothing is saved for it yet, such as Contexts before any is typed. */
+    const [chosen, setChosen] = React.useState<ScopeMode>("all");
+    const mode = saved === "all" ? chosen : saved;
+    const write = (next: ContextScope) => edit.set(path, withContextScope(item, next));
+    const textEditor = (toScope: (text: string) => ContextScope): Editor => ({
+        ...edit,
+        set: (_path, value) => write(toScope(String(value))),
+        remove: () => write({ contexts: [] }),
+        isMissing: () => false,
+    });
+    return (
+        <div className="context-scope">
+            <div className="input-row">
+                <select
+                    aria-label="Contexts"
+                    value={mode}
+                    onChange={(e) => {
+                        setChosen(e.target.value as ScopeMode);
+                        if (saved !== "all") {
+                            write({ contexts: [] });
+                        }
+                    }}
+                >
+                    <option value="all">All contexts</option>
+                    <option value="contexts">Contexts</option>
+                    <option value="query">Context query</option>
+                </select>
+                <IconButton
+                    icon="checklist"
+                    label="Pick Contexts..."
+                    title={
+                        edit.canPickContexts
+                            ? "Pick from the contexts of the running session"
+                            : "Start a session to this agent to pick from its contexts"
+                    }
+                    disabled={!edit.canPickContexts}
+                    onClick={() => edit.pickContexts(path)}
+                />
+            </div>
+            {mode === "contexts" && (
+                <TextInput
+                    field={CONTEXTS_INPUT}
+                    value={"contexts" in scope && scope.contexts.length > 0 ? scope.contexts.join(", ") : undefined}
+                    path={[...path, "contexts"]}
+                    edit={textEditor((text) => ({ contexts: parseContextList(text) }))}
+                />
+            )}
+            {mode === "query" && (
+                <TextInput
+                    field={QUERY_INPUT}
+                    value={"contextQuery" in scope ? scope.contextQuery : undefined}
+                    path={[...path, "contextQuery"]}
+                    edit={textEditor((text) => (text.trim() ? { contextQuery: text.trim() } : { contexts: [] }))}
+                />
+            )}
+        </div>
+    );
 }
 
 export function Unsupported({ value, edit }: { value: unknown; edit: Editor }) {

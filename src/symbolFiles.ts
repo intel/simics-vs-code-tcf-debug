@@ -9,9 +9,11 @@ export const SYMBOL_FILE_ID_PREFIX = "vscode-symbol-file-";
 export interface SymbolFileConfig {
     /** Path of the symbol file (ELF with debug information) as seen by the agent. */
     path: string;
-    /** Context ID or name the symbol file applies to. All contexts if not set. */
+    /** IDs or names of the contexts the symbol file applies to. All contexts if not set. */
+    contexts?: string[];
+    /** One context ID or name, read as `contexts` with one entry. */
     context?: string;
-    /** TCF context query selecting the contexts the symbol file applies to. */
+    /** TCF context query selecting the contexts the symbol file applies to. Not with `contexts`. */
     contextQuery?: string;
     /**
      * Relocation offset added to all addresses in the file, like the Simics
@@ -27,7 +29,8 @@ export interface SymbolFileConfig {
 
 export interface SymbolFile {
     path: string;
-    context: string;
+    /** Context IDs or names, empty for all contexts or those matching `contextQuery`. */
+    contexts: string[];
     contextQuery?: string;
     /** Relocation offset (may be negative), or the load address when `absolute` is set. */
     address?: bigint;
@@ -35,27 +38,45 @@ export interface SymbolFile {
     absolute?: true;
 }
 
-export function symbolFileBreakpointContext(
-    file: Pick<SymbolFileConfig, "context">,
+/** The context IDs to set a function breakpoint in for the symbol file's contexts. */
+export function symbolFileBreakpointContexts(
+    file: Pick<SymbolFileConfig, "contexts">,
     contexts: readonly { id: string; name: string }[],
-): string {
-    const scope = file.context;
-    if (!scope) {
-        throw new Error("The symbol file has no context");
+): string[] {
+    const scope = file.contexts ?? [];
+    if (scope.length === 0) {
+        throw new Error("The symbol file has no contexts");
     }
-    const exact = contexts.find((context) => context.id === scope);
-    if (exact) {
-        return exact.id;
-    }
-    const matches = contexts.filter((context) => context.name === scope);
-    if (matches.length !== 1) {
-        throw new Error(
-            matches.length === 0
-                ? `Symbol file context '${scope}' is not available in this session`
-                : `Symbol file context '${scope}' is ambiguous; use its exact TCF context ID`,
-        );
-    }
-    return matches[0].id;
+    return [
+        ...new Set(
+            scope.map((entry) => {
+                const exact = contexts.find((context) => context.id === entry);
+                if (exact) {
+                    return exact.id;
+                }
+                const matches = contexts.filter((context) => context.name === entry);
+                if (matches.length !== 1) {
+                    throw new Error(
+                        matches.length === 0
+                            ? `Symbol file context '${entry}' is not available in this session`
+                            : `Symbol file context '${entry}' is ambiguous; use its exact TCF context ID`,
+                    );
+                }
+                return matches[0].id;
+            }),
+        ),
+    ];
+}
+
+/** The symbol file as a "symbolFiles" entry of a debug configuration, with the address as a string. */
+export function symbolFileConfig(file: SymbolFile): SymbolFileConfig {
+    return {
+        path: file.path,
+        ...(file.contexts.length > 0 && { contexts: [...file.contexts] }),
+        ...(file.contextQuery !== undefined && { contextQuery: file.contextQuery }),
+        ...(file.address !== undefined && { address: file.address.toString() }),
+        ...(file.absolute && { absolute: true }),
+    };
 }
 
 /**
@@ -81,8 +102,24 @@ export function parseSymbolFilesConfig(value: unknown): { files: SymbolFile[]; e
             errors.push(`symbolFiles[${i}] is ignored, "context" must be a string`);
             return;
         }
+        if (
+            e.contexts !== undefined &&
+            (!Array.isArray(e.contexts) || !e.contexts.every((c) => typeof c === "string" && c.length > 0))
+        ) {
+            errors.push(`symbolFiles[${i}] is ignored, "contexts" must be a list of non-empty strings`);
+            return;
+        }
+        if (e.context !== undefined && e.contexts !== undefined) {
+            errors.push(`symbolFiles[${i}] is ignored, it has both "context" and "contexts"; use "contexts"`);
+            return;
+        }
         if (e.contextQuery !== undefined && (typeof e.contextQuery !== "string" || e.contextQuery.length === 0)) {
             errors.push(`symbolFiles[${i}] is ignored, "contextQuery" must be a non-empty string`);
+            return;
+        }
+        const contexts = [...new Set(e.contexts ?? (e.context ? [e.context] : []))];
+        if (contexts.length > 0 && e.contextQuery !== undefined) {
+            errors.push(`symbolFiles[${i}] is ignored, use either "contexts" or "contextQuery", not both`);
             return;
         }
         if (e.absolute !== undefined && typeof e.absolute !== "boolean") {
@@ -108,7 +145,7 @@ export function parseSymbolFilesConfig(value: unknown): { files: SymbolFile[]; e
         }
         files.push({
             path: e.path,
-            context: e.context ?? "",
+            contexts,
             contextQuery: e.contextQuery,
             address,
             ...(absolute && { absolute: true as const }),
@@ -120,13 +157,16 @@ export function parseSymbolFilesConfig(value: unknown): { files: SymbolFile[]; e
 /**
  * Adds symbol files to the agent's memory map, like "Load symbols" in the
  * Eclipse TCF client: each file becomes a memory region with FileName, set
- * with MemoryMap.set for its context, or for all contexts ("") with a
- * ContextQuery filter. A relocation offset is sent as BaseAddress (added to
+ * with MemoryMap.set for each of its contexts, or for all contexts ("")
+ * with an optional ContextQuery filter. A MemoryMap.set call takes a single
+ * context, so a file with several contexts is in the map of each one, with
+ * the same region ID. A relocation offset is sent as BaseAddress (added to
  * all file addresses, which is what Simics add-symbol-file -relative uses);
  * an absolute load address as Addr (the address of the file's first
  * loadable segment). The agent removes the regions when the debug session
  * ends. The region IDs start with `idPrefix`, so that the regions can be
- * recognized in MemoryMap.get results.
+ * recognized in MemoryMap.get results. The maps of contexts that only
+ * `previousFiles` used are cleared.
  */
 export async function applySymbolFiles(
     service: MemoryMapService,
@@ -152,16 +192,23 @@ export async function applySymbolFiles(
         if (f.contextQuery !== undefined) {
             region.ContextQuery = f.contextQuery;
         }
-        const regions = maps.get(f.context) ?? [];
-        regions.push(region);
-        maps.set(f.context, regions);
+        for (const context of symbolFileMapContexts(f)) {
+            const regions = maps.get(context) ?? [];
+            regions.push(region);
+            maps.set(context, regions);
+        }
     });
-    for (const file of previousFiles) {
-        if (!maps.has(file.context)) {
-            maps.set(file.context, []);
+    for (const context of previousFiles.flatMap(symbolFileMapContexts)) {
+        if (!maps.has(context)) {
+            maps.set(context, []);
         }
     }
     await Promise.all([...maps].map(([ctx, regions]) => service.set(ctx, regions)));
+}
+
+/** The contexts whose memory maps have the file's region: its contexts, or "" for all. */
+export function symbolFileMapContexts(file: Pick<SymbolFile, "contexts">): string[] {
+    return file.contexts.length > 0 ? file.contexts : [""];
 }
 
 /**

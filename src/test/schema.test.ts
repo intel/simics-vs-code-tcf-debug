@@ -10,7 +10,9 @@ import {
     launchFields,
     launchTemplate,
     parseInput,
+    readContextScope,
     valueAtPath,
+    withContextScope,
 } from "@/launchSettings/schema";
 import { DEFAULT_TRACE_SILENCE } from "@/tcf/traceSilence";
 
@@ -52,8 +54,7 @@ test("launchFields reads the simics-target-debug attributes from package.json", 
         symbolFiles?.columns?.map((c) => [c.key, c.kind, c.browse]),
         [
             ["path", "string", "file"],
-            ["context", "string", undefined],
-            ["contextQuery", "string", undefined],
+            ["contexts", "contextScope", undefined],
             ["address", "stringOrInteger", undefined],
             ["absolute", "boolean", undefined],
         ],
@@ -253,4 +254,34 @@ test("agentAddress defaults to the debug session's host and port", () => {
     assert.equal(agentAddress({}), "localhost:1534");
     assert.equal(agentAddress({ host: "simhost", port: 1600 }), "simhost:1600");
     assert.notEqual(agentAddress({ port: 1534 }), agentAddress({ port: 1535 }));
+});
+
+// The Contexts cell of a symbol file reads the old single "context" too, and
+// writes one scope attribute in place of the old ones.
+test("readContextScope and withContextScope edit the scope of a list item", () => {
+    assert.deepEqual(readContextScope({ path: "a" }), { contexts: [] });
+    assert.deepEqual(readContextScope({ context: "cpu0" }), { contexts: ["cpu0"] });
+    assert.deepEqual(readContextScope({ contexts: ["cpu0", 1, ""] }), { contexts: ["cpu0"] });
+    assert.deepEqual(readContextScope({ contexts: ["cpu0"], contextQuery: "HasState=true" }), {
+        contextQuery: "HasState=true",
+    });
+
+    const item = { path: "a.elf", context: "cpu0", address: "0x1000" };
+    const contexts = withContextScope(item, { contexts: ["cpu0", "cpu1"] });
+    assert.deepEqual(Object.entries(contexts), [
+        ["path", "a.elf"],
+        ["contexts", ["cpu0", "cpu1"]],
+        ["address", "0x1000"],
+    ]);
+    assert.deepEqual(Object.entries(withContextScope(contexts, { contextQuery: "HasState=true" })), [
+        ["path", "a.elf"],
+        ["contextQuery", "HasState=true"],
+        ["address", "0x1000"],
+    ]);
+    assert.deepEqual(withContextScope(contexts, { contexts: [] }), { path: "a.elf", address: "0x1000" });
+    assert.deepEqual(Object.keys(withContextScope({ address: 1, path: "a" }, { contexts: ["c"] })), [
+        "address",
+        "path",
+        "contexts",
+    ]);
 });

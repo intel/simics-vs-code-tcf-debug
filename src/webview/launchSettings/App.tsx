@@ -292,6 +292,8 @@ function Details(props: {
         browse: (path, pick) => post({ type: "browse", ...target, path, pick }),
         isMissing: (path) => missing.has(`${config.index}:${path.join("/")}`),
         openText: () => post({ type: "openText" }),
+        pickContexts: (path) => post({ type: "pickContexts", ...target, path }),
+        canPickContexts: state.busyAgents.includes(agentAddress(config.values)),
     };
     const sameName = (nameCounts(props.configs).get(config.name) ?? 0) > 1;
     const known = new Set(state.fields.map((f) => fieldPath(f)[0]));

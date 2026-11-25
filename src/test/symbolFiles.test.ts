@@ -9,6 +9,8 @@ import {
     describeForeignSymbolFile,
     formatSymbolFileAddress,
     parseSymbolFilesConfig,
+    symbolFileBreakpointContexts,
+    symbolFileConfig,
 } from "@/symbolFiles";
 import { MemoryMapService, MemoryRegionProperties } from "@/tcf/services/memoryMap";
 
@@ -38,25 +40,25 @@ test("parseSymbolFilesConfig reads valid entries", () => {
     assert.deepEqual(files, [
         {
             path: "/a.elf",
-            context: "",
+            contexts: [],
             contextQuery: undefined,
             address: undefined,
         },
         {
             path: "/b.elf",
-            context: "cpu0",
+            contexts: ["cpu0"],
             contextQuery: undefined,
             address: 4096n,
         },
         {
             path: "/c.elf",
-            context: "",
+            contexts: [],
             contextQuery: "Name=cpu*",
             address: 0xffff0000n,
         },
         {
             path: "/d.elf",
-            context: "",
+            contexts: [],
             contextQuery: undefined,
             address: 0x123456789abcdef0n,
         },
@@ -95,6 +97,79 @@ test("parseSymbolFilesConfig reports invalid entries", () => {
     ]);
 });
 
+// "contexts" lists IDs or names, the old "context" is read as a list of one.
+// A file has either contexts or a context query.
+test("parseSymbolFilesConfig reads context lists and rejects mixed scopes", () => {
+    const { files, errors } = parseSymbolFilesConfig([
+        { path: "/a.elf", contexts: ["cpu0", "board.cpu1", "cpu0"] },
+        { path: "/b.elf", context: "cpu0" },
+        { path: "/c.elf", contexts: [] },
+        { path: "/d.elf", contexts: ["cpu0"], contextQuery: "HasState=true" },
+        { path: "/e.elf", context: "cpu0", contextQuery: "HasState=true" },
+        { path: "/f.elf", context: "cpu0", contexts: ["cpu1"] },
+        { path: "/g.elf", contexts: "cpu0" },
+        { path: "/h.elf", contexts: ["cpu0", ""] },
+    ]);
+    assert.deepEqual(
+        files.map((f) => [f.path, f.contexts]),
+        [
+            ["/a.elf", ["cpu0", "board.cpu1"]],
+            ["/b.elf", ["cpu0"]],
+            ["/c.elf", []],
+        ],
+    );
+    assert.deepEqual(errors, [
+        'symbolFiles[3] is ignored, use either "contexts" or "contextQuery", not both',
+        'symbolFiles[4] is ignored, use either "contexts" or "contextQuery", not both',
+        'symbolFiles[5] is ignored, it has both "context" and "contexts"; use "contexts"',
+        'symbolFiles[6] is ignored, "contexts" must be a list of non-empty strings',
+        'symbolFiles[7] is ignored, "contexts" must be a list of non-empty strings',
+    ]);
+    assert.deepEqual(symbolFileConfig(files[0]), { path: "/a.elf", contexts: ["cpu0", "board.cpu1"] });
+    assert.deepEqual(symbolFileConfig(files[2]), { path: "/c.elf" });
+});
+
+// MemoryMap.set takes one context, so a file with several contexts is in
+// each of their maps. Maps that only the previous files used are cleared.
+test("applySymbolFiles sets the region in the map of each context", async () => {
+    const calls: [string, MemoryRegionProperties[]][] = [];
+    const service = {
+        set: async (contextId: string, regions: MemoryRegionProperties[]) => {
+            calls.push([contextId, regions]);
+        },
+    } as unknown as MemoryMapService;
+
+    await applySymbolFiles(
+        service,
+        [
+            { path: "/a.elf", contexts: ["cpu0", "cpu1"], address: 0x1000n },
+            { path: "/b.elf", contexts: ["cpu1"] },
+        ],
+        () => {},
+        [{ path: "/old.elf", contexts: ["cpu1", "cpu2"] }],
+    );
+
+    const a = { ID: "vscode-symbol-file-1", FileName: "/a.elf", BaseAddress: 0x1000n };
+    assert.deepEqual(calls, [
+        ["cpu0", [a]],
+        ["cpu1", [a, { ID: "vscode-symbol-file-2", FileName: "/b.elf" }]],
+        ["cpu2", []],
+    ]);
+});
+
+test("symbolFileBreakpointContexts resolves each context of the file", () => {
+    const contexts = [
+        { id: "core-0", name: "board.cpu0" },
+        { id: "core-1", name: "board.cpu1" },
+    ];
+    assert.deepEqual(symbolFileBreakpointContexts({ contexts: ["board.cpu1", "core-0", "core-1"] }, contexts), [
+        "core-1",
+        "core-0",
+    ]);
+    assert.throws(() => symbolFileBreakpointContexts({ contexts: [] }, contexts), /no contexts/);
+    assert.throws(() => symbolFileBreakpointContexts({ contexts: ["core-0", "gone"] }, contexts), /'gone' is not/);
+});
+
 // Files for the same context share one MemoryMap.set. A missing file only
 // gives a warning, since the agent may run on another host.
 test("applySymbolFiles sets one memory map per context", async () => {
@@ -112,9 +187,9 @@ test("applySymbolFiles sets one memory map per context", async () => {
     await applySymbolFiles(
         service,
         [
-            { path: present, context: "" },
-            { path: "/missing/kernel.elf", context: "cpu0", address: 0x1000n },
-            { path: present, context: "", contextQuery: "Name=cpu1" },
+            { path: present, contexts: [] },
+            { path: "/missing/kernel.elf", contexts: ["cpu0"], address: 0x1000n },
+            { path: present, contexts: [], contextQuery: "Name=cpu1" },
         ],
         (message) => warnings.push(message),
     );
@@ -159,11 +234,11 @@ test("parseSymbolFilesConfig reads offsets and absolute addresses", () => {
         { path: "/h.elf", address: "-" },
     ]);
     assert.deepEqual(files, [
-        { path: "/a.elf", context: "", contextQuery: undefined, address: 0x1000n },
-        { path: "/b.elf", context: "", contextQuery: undefined, address: -0x300000n },
-        { path: "/c.elf", context: "", contextQuery: undefined, address: -16n },
-        { path: "/d.elf", context: "", contextQuery: undefined, address: 0xff000n, absolute: true },
-        { path: "/e.elf", context: "", contextQuery: undefined, address: 0x1000n },
+        { path: "/a.elf", contexts: [], contextQuery: undefined, address: 0x1000n },
+        { path: "/b.elf", contexts: [], contextQuery: undefined, address: -0x300000n },
+        { path: "/c.elf", contexts: [], contextQuery: undefined, address: -16n },
+        { path: "/d.elf", contexts: [], contextQuery: undefined, address: 0xff000n, absolute: true },
+        { path: "/e.elf", contexts: [], contextQuery: undefined, address: 0x1000n },
     ]);
     assert.deepEqual(errors, [
         'symbolFiles[5] is ignored, "absolute" requires an "address" to load the file at',
@@ -185,8 +260,8 @@ test("applySymbolFiles sends offsets as BaseAddress and absolute addresses as Ad
     await applySymbolFiles(
         service,
         [
-            { path: "/a.elf", context: "", address: -0x300000n },
-            { path: "/b.elf", context: "", address: 0xff000n, absolute: true },
+            { path: "/a.elf", contexts: [], address: -0x300000n },
+            { path: "/b.elf", contexts: [], address: 0xff000n, absolute: true },
         ],
         () => {},
     );
@@ -219,7 +294,7 @@ test("applySymbolFiles uses the ID prefix", async () => {
         },
     } as unknown as MemoryMapService;
 
-    await applySymbolFiles(service, [{ path: "/a.elf", context: "" }], () => {}, [], "vscode-symbol-file-abc-");
+    await applySymbolFiles(service, [{ path: "/a.elf", contexts: [] }], () => {}, [], "vscode-symbol-file-abc-");
 
     assert.deepEqual(calls, [["", [{ ID: "vscode-symbol-file-abc-1", FileName: "/a.elf" }]]]);
 });

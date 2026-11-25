@@ -24,6 +24,9 @@ All notable changes to the Simics Target Debug extension will be documented here
 - The Path Maps view lists the agent's rules from elsewhere, for example
   added with `add-pathmap-entry` in Simics, read-only under
   **Added Elsewhere**, like the Symbol Files view does.
+- A symbol file can apply to several contexts: `symbolFiles` entries take
+  a `contexts` list of IDs or names. The file is added to the memory map of
+  each context.
 
 ### Changed
 
@@ -40,6 +43,13 @@ All notable changes to the Simics Target Debug extension will be documented here
   services and message types.
   Stay in Console is gone from TCF Launch Configurations,
   turn off `debug.focusEditorOnBreak` instead.
+- Symbol files and function breakpoints pick their contexts with the same
+  checklist. For symbol files, a button in its title bar switches to a
+  context query. In TCF Launch Configurations, the Contexts column of Symbol
+  Files chooses all contexts, a list of contexts, or a query, and can pick
+  contexts from a running session to the agent.
+- The `context` of a symbol file is deprecated, use `contexts`. A symbol file
+  can no longer have both contexts and a `contextQuery`.
 - In TCF Launch Configurations, the Start, Duplicate and Delete buttons
   above the form, and the Add and Delete All buttons above the list, stay
   visible when you scroll.

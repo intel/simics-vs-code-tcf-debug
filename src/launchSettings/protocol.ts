@@ -28,6 +28,8 @@ export type WebviewMessage =
     | { type: "remove"; index: number; name: string; path: JsonPath }
     /** Pick a file or folder for the path attribute at `path`. */
     | { type: "browse"; index: number; name: string; path: JsonPath; pick: "file" | "folder" }
+    /** Pick the contexts of the list item at `path` from a session to the configuration's agent. */
+    | { type: "pickContexts"; index: number; name: string; path: JsonPath }
     | { type: "add" }
     | { type: "duplicate"; index: number; name: string }
     | { type: "delete"; index: number; name: string }

@@ -24,6 +24,9 @@ All notable changes to the Simics Target Debug extension will be documented here
 - The Path Maps view lists the agent's rules from elsewhere, for example
   added with `add-pathmap-entry` in Simics, read-only under
   **Added Elsewhere**, like the Symbol Files view does.
+- A path map rule can apply to several contexts: `pathMap` rules take a
+  `contexts` list of context IDs. Each context is sent to the agent as a rule
+  of its own. The old `context` is deprecated.
 - Function breakpoints can be scoped with a TCF context query, written as
   `start_kernel @? **/HasState=true`. It is sent as the `ContextQuery`
   breakpoint property. **Add Function Breakpoint...** in Symbol Files also
@@ -47,11 +50,12 @@ All notable changes to the Simics Target Debug extension will be documented here
   services and message types.
   Stay in Console is gone from TCF Launch Configurations,
   turn off `debug.focusEditorOnBreak` instead.
-- Symbol files and function breakpoints pick their contexts the same way:
-  a menu with all contexts, the selected call-stack context, a checklist of
-  contexts, or a context query. In TCF Launch Configurations, the Contexts column of Symbol
-  Files chooses all contexts, a list of contexts, or a query, and can pick
-  contexts from a running session to the agent.
+- Symbol files, function breakpoints and path map rules pick their contexts
+  the same way: a menu with all contexts, the selected call-stack context, a
+  checklist of contexts, or a context query. In TCF Launch Configurations,
+  the Contexts column of Symbol Files and Path Map chooses all contexts, a
+  list of contexts, or a query, and can pick contexts from a running session
+  to the agent.
 - The `context` of a symbol file is deprecated, use `contexts`. A symbol file
   can no longer have both contexts and a `contextQuery`.
 - In TCF Launch Configurations, the Start, Duplicate and Delete buttons

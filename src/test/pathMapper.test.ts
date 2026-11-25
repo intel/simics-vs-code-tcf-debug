@@ -9,7 +9,7 @@ import {
     mapPrefix,
     parsePathMapConfig,
     pathMapProblems,
-    pathMapContextQuery,
+    pathMapContextQueries,
 } from "@/pathMapper";
 import { PathMapRuleProperties, PathMapService } from "@/tcf/services/pathMap";
 
@@ -449,11 +449,22 @@ test("scope parsing preserves IDs and queries without broadening invalid rules",
     const base = { source: "/build", destination: "/host" };
     const valid = [
         base,
-        { ...base, context: "cpu0" },
+        { ...base, contexts: ["cpu0", "cpu1"] },
         { ...base, contextQuery: "ID=cpu0" },
         { ...base, contextQuery: "/server/**/HasState=true" },
     ];
     assert.deepEqual(parsePathMapConfig(valid), { rules: valid, errors: [] });
+    // The old single "context" is read as a list of one, an empty list as all contexts.
+    assert.deepEqual(
+        parsePathMapConfig([
+            { ...base, context: "cpu0" },
+            { ...base, contexts: [], contextQuery: "*" },
+        ]).rules,
+        [
+            { ...base, contexts: ["cpu0"] },
+            { ...base, contextQuery: "*" },
+        ],
+    );
     for (const scope of [
         { context: "" },
         { context: "   " },
@@ -462,6 +473,10 @@ test("scope parsing preserves IDs and queries without broadening invalid rules",
         { contextQuery: "  " },
         { contextQuery: false },
         { context: "cpu0", contextQuery: "*" },
+        { contexts: ["cpu0"], contextQuery: "*" },
+        { context: "cpu0", contexts: ["cpu1"] },
+        { contexts: "cpu0" },
+        { contexts: ["cpu0", " "] },
     ]) {
         const result = parsePathMapConfig([{ ...base, ...scope }]);
         assert.deepEqual(result.rules, []);
@@ -495,7 +510,36 @@ test("apply and replacement send exact ContextQuery wire properties", async () =
     }
     await mapper.replaceRules(mapper.getRules());
     assert.deepEqual(fake.sets[1], fake.sets[0]);
-    assert.equal(pathMapContextQuery({ context: "cpu0" }), "ID=cpu0");
+    assert.deepEqual(pathMapContextQueries({ context: "cpu0" }), ["ID=cpu0"]);
+});
+
+// A query cannot select one of several IDs, so a rule for several contexts
+// is one agent rule per context, and maps paths in each of them.
+test("a rule with several contexts is one agent rule per context", async () => {
+    const fake = fakePathMapService([]);
+    const mapper = new PathMapper(
+        [
+            { source: "/build", destination: "/cpus", contexts: ["cpu0", "cpu1"] },
+            { source: "/lib", destination: "/host-lib" },
+        ],
+        fake.service,
+    );
+    await mapper.apply();
+    const ids = fake.sets[0].map((r) => String(r.ID).replace(/^vscode-tcf-[^-]+(-[^-]+){4}/, "<prefix>"));
+    assert.deepEqual(ids, ["<prefix>-1-1", "<prefix>-1-2", "<prefix>-2"]);
+    assert.deepEqual(
+        fake.sets[0].map((r) => [r.Source, r.ContextQuery]),
+        [
+            ["/build", "ID=cpu0"],
+            ["/build", "ID=cpu1"],
+            ["/lib", undefined],
+        ],
+    );
+    const local = new PathMapper([{ source: "/build", destination: "/cpus", contexts: ["cpu0", "cpu1"] }], undefined);
+    assert.equal(await local.toHost("/build/a.c", "cpu1"), "/cpus/a.c");
+    assert.equal(await local.toHost("/build/a.c", "cpu2"), "/build/a.c");
+    assert.deepEqual(await local.toTargetLocation("/cpus/a.c", "cpu0"), { path: "/build/a.c", contextId: "cpu0" });
+    assert.deepEqual(await local.toTargetLocation("/cpus/a.c", "cpu2"), { path: "/cpus/a.c" });
 });
 
 test("identical compiled paths are mapped and cached separately per context", async () => {

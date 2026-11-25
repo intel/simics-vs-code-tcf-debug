@@ -10,7 +10,9 @@ export interface PathMapRule {
     source: string;
     /** Corresponding path prefix on the host running VS Code. */
     destination: string;
-    /** Exact context ID. Use this or contextQuery, not both. */
+    /** Exact context IDs. Use this or contextQuery, not both. */
+    contexts?: string[];
+    /** One exact context ID, read as `contexts` with one entry. */
     context?: string;
     /** TCF query selecting contexts. Omitted means all contexts. */
     contextQuery?: string;
@@ -33,13 +35,26 @@ export interface TargetPath {
     contextId?: string;
 }
 
-/** The wire representation always uses ContextQuery, including exact IDs. */
-export function pathMapContextQuery(rule: Pick<PathMapRule, "context" | "contextQuery">): string | undefined {
-    if (rule.context) {
-        const id = /^[A-Za-z_][A-Za-z0-9_]*$/.test(rule.context) ? rule.context : JSON.stringify(rule.context);
-        return `ID=${id}`;
+/**
+ * The ContextQuery of each agent rule for the rule, empty for all contexts.
+ * The wire representation always uses ContextQuery, including exact IDs.
+ * A query cannot select one of several IDs, so a rule with several contexts
+ * is one agent rule per context.
+ */
+export function pathMapContextQueries(rule: Pick<PathMapRule, "contexts" | "context" | "contextQuery">): string[] {
+    const contexts = rule.contexts ?? (rule.context ? [rule.context] : []);
+    if (contexts.length > 0) {
+        return contexts.map((context) => {
+            const id = /^[A-Za-z_][A-Za-z0-9_]*$/.test(context) ? context : JSON.stringify(context);
+            return `ID=${id}`;
+        });
     }
-    return rule.contextQuery;
+    return rule.contextQuery ? [rule.contextQuery] : [];
+}
+
+/** True if the queries limit a rule to some contexts. */
+function isScoped(queries: readonly string[]): boolean {
+    return queries.length > 0 && !queries.some((query) => query === "*" || query === "**");
 }
 
 /**
@@ -109,14 +124,20 @@ export class PathMapper {
 
     private async commitRules(rules: PathMapRule[]): Promise<void> {
         await this.service?.set(
-            rules.map((rule, i) => ({
-                ID: `${this.idPrefix}-${i + 1}`,
-                Source: rule.source,
-                Destination: rule.destination,
-                ...(pathMapContextQuery(rule) && {
-                    ContextQuery: pathMapContextQuery(rule),
-                }),
-            })),
+            rules.flatMap((rule, i) => {
+                const queries = pathMapContextQueries(rule);
+                const base = { Source: rule.source, Destination: rule.destination };
+                if (queries.length <= 1) {
+                    return [
+                        { ID: `${this.idPrefix}-${i + 1}`, ...base, ...(queries[0] && { ContextQuery: queries[0] }) },
+                    ];
+                }
+                return queries.map((query, j) => ({
+                    ID: `${this.idPrefix}-${i + 1}-${j + 1}`,
+                    ...base,
+                    ContextQuery: query,
+                }));
+            }),
         );
         this.rules.splice(0, this.rules.length, ...rules);
         this.reset();
@@ -133,7 +154,7 @@ export class PathMapper {
                 (r) =>
                     r.source === rule.source &&
                     r.destination === rule.destination &&
-                    pathMapContextQuery(r) === pathMapContextQuery(rule),
+                    JSON.stringify(pathMapContextQueries(r)) === JSON.stringify(pathMapContextQueries(rule)),
             );
             if (!known) {
                 rules.push({ ...rule });
@@ -153,7 +174,7 @@ export class PathMapper {
         const candidates: string[] = [];
         for (const r of this.rules) {
             const p = mapPrefix(compiledPath, r.source, r.destination);
-            if (p !== undefined && (await this.matches(pathMapContextQuery(r), contextId))) {
+            if (p !== undefined && (await this.matchesAny(pathMapContextQueries(r), contextId))) {
                 candidates.push(p);
             }
         }
@@ -195,8 +216,8 @@ export class PathMapper {
                 continue;
             }
             const p = mapPrefix(hostPath, r.destination, r.source);
-            const query = pathMapContextQuery(r);
-            if (p !== undefined && query && query !== "*" && query !== "**" && !contextId && !this.service) {
+            const queries = pathMapContextQueries(r);
+            if (p !== undefined && isScoped(queries) && !contextId && !this.service) {
                 throw new Error(
                     "Scoped breakpoint path mapping needs a context ID " + "or an agent with the PathMap service",
                 );
@@ -206,17 +227,8 @@ export class PathMapper {
             if (p !== undefined && this.service && !contextId) {
                 return { path: hostPath };
             }
-            if (p !== undefined && (await this.matches(query, contextId))) {
-                return this.agentMapsPaths
-                    ? { path: hostPath }
-                    : {
-                          path: p,
-                          ...(query &&
-                              query !== "*" &&
-                              query !== "**" && {
-                                  contextId,
-                              }),
-                      };
+            if (p !== undefined && (await this.matchesAny(queries, contextId))) {
+                return this.agentMapsPaths ? { path: hostPath } : { path: p, ...(isScoped(queries) && { contextId }) };
             }
         }
         for (const r of await this.otherAgentRules()) {
@@ -244,6 +256,19 @@ export class PathMapper {
         this.generation++;
         this.hostPathCache.clear();
         this.queryCache.clear();
+    }
+
+    /** True if the rule applies to the context: it has no queries, or one of them matches. */
+    private async matchesAny(queries: readonly string[], contextId: string | undefined): Promise<boolean> {
+        if (queries.length === 0) {
+            return true;
+        }
+        for (const query of queries) {
+            if (await this.matches(query, contextId)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private async matches(query: string | undefined, contextId: string | undefined): Promise<boolean> {
@@ -340,8 +365,21 @@ export function parsePathMapConfig(value: unknown): { rules: PathMapRule[]; erro
                 return;
             }
         }
-        if (e?.context !== undefined && e.contextQuery !== undefined) {
-            errors.push(`pathMap[${i}] is ignored, use "context" or ` + '"contextQuery", not both');
+        if (
+            e?.contexts !== undefined &&
+            (!Array.isArray(e.contexts) ||
+                !e.contexts.every((c: unknown) => typeof c === "string" && c.trim().length > 0))
+        ) {
+            errors.push(`pathMap[${i}] is ignored, "contexts" must be a list of non-empty strings`);
+            return;
+        }
+        if (e?.context !== undefined && e.contexts !== undefined) {
+            errors.push(`pathMap[${i}] is ignored, it has both "context" and "contexts"; use "contexts"`);
+            return;
+        }
+        const contexts = [...new Set(e?.contexts ?? (e?.context !== undefined ? [e.context] : []))];
+        if (contexts.length > 0 && e?.contextQuery !== undefined) {
+            errors.push(`pathMap[${i}] is ignored, use "contexts" or ` + '"contextQuery", not both');
             return;
         }
         if (
@@ -353,7 +391,7 @@ export function parsePathMapConfig(value: unknown): { rules: PathMapRule[]; erro
             rules.push({
                 source: e.source,
                 destination: e.destination,
-                ...(e.context !== undefined && { context: e.context }),
+                ...(contexts.length > 0 && { contexts }),
                 ...(e.contextQuery !== undefined && {
                     contextQuery: e.contextQuery,
                 }),

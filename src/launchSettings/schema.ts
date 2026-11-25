@@ -321,7 +321,8 @@ export function readContextScope(item: unknown): ContextScope {
 
 /**
  * The list item with its scope attributes replaced by `scope`, where the
- * first of them was, else after "path". All contexts leaves them out.
+ * first of them was, else after "path", else last. All contexts leaves them
+ * out.
  */
 export function withContextScope(item: Record<string, unknown>, scope: ContextScope): Record<string, unknown> {
     const attributes: Record<string, unknown> =
@@ -332,7 +333,7 @@ export function withContextScope(item: Record<string, unknown>, scope: ContextSc
               : {};
     const keys = Object.keys(item);
     const after = keys.find((k) => CONTEXT_SCOPE_KEYS.includes(k)) ?? (keys.includes("path") ? "path" : undefined);
-    const result: Record<string, unknown> = after === undefined ? { ...attributes } : {};
+    const result: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(item)) {
         if (!CONTEXT_SCOPE_KEYS.includes(key)) {
             result[key] = value;
@@ -341,7 +342,7 @@ export function withContextScope(item: Record<string, unknown>, scope: ContextSc
             Object.assign(result, attributes);
         }
     }
-    return result;
+    return after === undefined ? { ...result, ...attributes } : result;
 }
 
 interface DebuggerContribution {

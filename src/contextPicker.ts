@@ -32,6 +32,8 @@ export interface PickContextsOptions {
     placeholder?: string;
     /** Offer typed text as a context ID or name to check, for contexts that are not listed. */
     allowTyped?: boolean;
+    /** Typed text is a context ID only, not a name. */
+    idsOnly?: boolean;
 }
 
 /** The scope picked, Back, or undefined when cancelled. */
@@ -148,9 +150,9 @@ function check(options: PickContextsOptions, initial: readonly string[]): Promis
                 );
                 typedItem = {
                     label: typed,
-                    description: typedOnly
-                        ? "Press Enter or check to use this context ID or name"
-                        : "Check to use this context ID or name",
+                    description: `${typedOnly ? "Press Enter or check" : "Check"} to use this context ${
+                        options.idsOnly ? "ID" : "ID or name"
+                    }`,
                     value: typed,
                     picked: false,
                     alwaysShow: true,

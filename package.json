@@ -944,15 +944,25 @@
                                             "format": "file-or-folder-path",
                                             "description": "Corresponding path prefix on this host, for example ${workspaceFolder}."
                                         },
-                                        "context": {
-                                            "type": "string",
-                                            "minLength": 1,
-                                            "description": "Exact context ID. Sent to PathMap.set as ContextQuery=\"ID=<id>\". Use either context or contextQuery, not both. Omit both to apply to all contexts."
+                                        "contexts": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string",
+                                                "minLength": 1
+                                            },
+                                            "uniqueItems": true,
+                                            "description": "Exact context IDs. Each is sent to PathMap.set as a rule with ContextQuery=\"ID=<id>\". Use either contexts or contextQuery, not both. Omit both to apply to all contexts."
                                         },
                                         "contextQuery": {
                                             "type": "string",
                                             "minLength": 1,
-                                            "description": "TCF context query selecting a group of contexts, for example \"**/HasState=true\" or \"ID=cpu0\". Sent as the ContextQuery property of PathMap.set. Use either context or contextQuery, not both."
+                                            "description": "TCF context query selecting a group of contexts, for example \"/server/**/HasState=true\". Sent as the ContextQuery property of PathMap.set. Use either contexts or contextQuery, not both."
+                                        },
+                                        "context": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "description": "Exact context ID.",
+                                            "deprecationMessage": "Use \"contexts\" instead, a list of context IDs."
                                         }
                                     }
                                 },

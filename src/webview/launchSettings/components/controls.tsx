@@ -374,7 +374,7 @@ const CONTEXTS_INPUT: Field = {
     key: "contexts",
     label: "Contexts",
     kind: "string",
-    default: "IDs or names, separated by commas",
+    default: "Separated by commas",
 };
 const QUERY_INPUT: Field = { key: "contextQuery", label: "Context Query", kind: "string" };
 

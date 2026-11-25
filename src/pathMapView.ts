@@ -2,8 +2,9 @@ import * as path from "path";
 import * as vscode from "vscode";
 import { activeRootSession } from "./contextSessionManager";
 import { savePathMapRules, withWorkspaceFolder } from "./locateSource";
-import { ForeignPathMapRule, PathMapRule, pathMapContextQuery } from "./pathMapper";
-import { promptPathMapScope } from "./pathMapScope";
+import { describeContextScope } from "./contextChoices";
+import { ForeignPathMapRule, PathMapRule } from "./pathMapper";
+import { pathMapRuleScope, promptPathMapScope } from "./pathMapScope";
 
 const VIEW = "simics-target-debug.pathMap";
 const DEBUG_TYPE = "simics-target-debug";
@@ -17,7 +18,7 @@ class PathMapItem extends vscode.TreeItem {
         readonly session: vscode.DebugSession,
     ) {
         super(rule.source);
-        const scope = pathMapContextQuery(rule) ?? "all contexts";
+        const scope = describeContextScope(pathMapRuleScope(rule));
         this.description = `${rule.destination} (${scope})`;
         this.tooltip = `${index + 1}. ${rule.source}\n` + `To: ${rule.destination}\nScope: ${scope}`;
         this.iconPath = new vscode.ThemeIcon("replace-all");
@@ -161,7 +162,7 @@ function checkItem(rules: PathMapRule[], item?: PathMapItem): void {
         item &&
         (rules[item.index]?.source !== item.rule.source ||
             rules[item.index]?.destination !== item.rule.destination ||
-            pathMapContextQuery(rules[item.index]) !== pathMapContextQuery(item.rule))
+            JSON.stringify(pathMapRuleScope(rules[item.index])) !== JSON.stringify(pathMapRuleScope(item.rule)))
     ) {
         throw new Error("Path map rules changed. Refresh and retry.");
     }
@@ -201,7 +202,7 @@ async function editRule(session: vscode.DebugSession, item?: PathMapItem): Promi
     if (destination === undefined) {
         return;
     }
-    const scope = await promptPathMapScope(item?.rule);
+    const scope = await promptPathMapScope(session, item?.rule);
     if (scope === undefined) {
         return;
     }

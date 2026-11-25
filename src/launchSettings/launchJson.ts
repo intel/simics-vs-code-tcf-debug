@@ -99,6 +99,7 @@ export function setPathMapRules(
     rules: readonly {
         source: string;
         destination: string;
+        contexts?: string[];
         context?: string;
         contextQuery?: string;
     }[],

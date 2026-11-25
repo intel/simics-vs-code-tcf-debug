@@ -347,13 +347,15 @@ async function pickItemContexts(
             `Could not list TCF contexts, type their IDs or names: ${err instanceof Error ? err.message : String(err)}`,
         );
     }
-    const file = item.path;
+    // A symbol file has a path, a path map rule a source; path map rules take context IDs only.
+    const label = typeof item.path === "string" ? item.path : item.source;
     const scope = await pickContexts({
-        title: typeof file === "string" && file ? `Contexts for ${file}` : "Contexts",
+        title: typeof label === "string" && label ? `Contexts for ${label}` : "Contexts",
         contexts,
         scope: readContextScope(item),
-        placeholder: "Check the contexts, or check none for all contexts",
+        placeholder: "Check the contexts",
         allowTyped: true,
+        idsOnly: itemPath[0] === "pathMap",
     });
     if (scope === undefined) {
         return;

@@ -3,8 +3,9 @@ import * as path from "path";
 import * as vscode from "vscode";
 import { setPathMapRules } from "./launchSettings/launchJson";
 import { applyAndSave } from "./launchSettings/editorProvider";
-import { PathMapRule, deriveRule, pathMapContextQuery } from "./pathMapper";
-import { promptPathMapScope } from "./pathMapScope";
+import { describeContextScope } from "./contextChoices";
+import { PathMapRule, deriveRule } from "./pathMapper";
+import { pathMapRuleScope, promptPathMapScope } from "./pathMapScope";
 
 /** A source file of a stack frame that is not on this host. */
 export interface MissingSource {
@@ -85,7 +86,7 @@ export class SourceLocator {
         if (!picked?.[0]) {
             return;
         }
-        const scope = await promptPathMapScope({}, missing.contextId);
+        const scope = await promptPathMapScope(session, {}, missing.contextId);
         if (scope === undefined) {
             return;
         }
@@ -114,7 +115,7 @@ export class SourceLocator {
         const message =
             `Added the path map rule ${rule.source} → ` +
             `${rule.destination} for this session ` +
-            `(${pathMapContextQuery(rule) ?? "all contexts"}).`;
+            `(${describeContextScope(pathMapRuleScope(rule))}).`;
         if (!launchJson || !fs.existsSync(launchJson.fsPath)) {
             void vscode.window.showInformationMessage(message);
             return;

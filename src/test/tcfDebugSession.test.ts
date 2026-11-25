@@ -91,7 +91,7 @@ test(
                 {
                     source: path.dirname(compiled),
                     destination: path.join(dir, "cpu0"),
-                    context: "cpu0",
+                    contexts: ["cpu0"],
                 },
                 {
                     source: path.dirname(compiled),

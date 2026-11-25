@@ -565,8 +565,9 @@ buttons in the editor title switch between the form and the text of
   under **Advanced** at the end, with `connectTimeout`. Others, like
   `preLaunchTask`, are listed under **Other Attributes** when set, and can be
   edited in the text.
-- The **Contexts** column of Symbol Files chooses all contexts, a list of
-  context IDs or names separated by commas, or a context query. Its checklist
+- The **Contexts** column of Symbol Files and Path Map chooses all contexts,
+  a list of contexts separated by commas (IDs or names for symbol files, IDs
+  for path map rules), or a context query. Its checklist
   button picks them with the picker of the Symbol Files view, from the
   contexts of a running debug session to the configuration's agent; without
   one, type them. Changing the contexts writes `contexts` or `contextQuery`
@@ -718,14 +719,14 @@ A prefix only matches at a path separator, so `/build/src` maps
 compiled paths. Invalid rules are reported in the Debug Console and ignored.
 
 Rules apply to **all contexts by default**. To scope a rule, set either
-`context` to an exact context ID or `contextQuery` to a TCF query:
+`contexts` to a list of exact context IDs or `contextQuery` to a TCF query:
 
 ```json
 "pathMap": [
   {
     "source": "/build/src",
     "destination": "${workspaceFolder}/cpu0",
-    "context": "cpu0"
+    "contexts": ["cpu0", "cpu1"]
   },
   {
     "source": "/build/src",
@@ -736,11 +737,13 @@ Rules apply to **all contexts by default**. To scope a rule, set either
 ```
 
 Both options use the protocol's `ContextQuery` property in `PathMap.set`.
-For example, `context: "cpu0"` is sent as `ContextQuery: "ID=cpu0"`;
-`contextQuery: "ID=cpu0"` is equivalent. IDs containing punctuation are
-quoted and escaped as TCF query values. Set only one scope field per rule;
-to select an ID together with additional criteria, use a query such as
-`ID=cpu0,HasState=true`.
+For example, `contexts: ["cpu0"]` is sent as `ContextQuery: "ID=cpu0"`;
+`contextQuery: "ID=cpu0"` is equivalent. A query cannot select one of several
+IDs, so a rule with several contexts is sent as one agent rule per context.
+IDs containing punctuation are quoted and escaped as TCF query values. Set
+only one scope field per rule; to select an ID together with additional
+criteria, use a query such as `ID=cpu0,HasState=true`. The old `context`, a
+single ID, still works and is deprecated.
 
 Source lookups and their caches are context-specific, including rules
 reported by `PathMap.get`, so identical compiled paths in different contexts
@@ -759,13 +762,15 @@ path map rule is made from the part of the two paths that differs, for example
 `/build` → `/home/me` for `/build/fw/a.c` and `/home/me/fw/a.c`. The rule is
 used at once for the rest of the session, including breakpoints, and can be
 saved to the configuration's `pathMap` in launch.json. Before applying the
-new rule, choose **All contexts**, **Context ID** (prefilled with the frame's
-context ID), or **Context query**.
+new rule, choose its contexts with the same picker as for breakpoints and
+symbol files: **All contexts**, the frame's context, **Pick Contexts...** or
+**Context Query...**.
 
 During a Simics Target Debug session, **Run and Debug > Path Maps** lists the
 session's rules in matching order, with the compiled prefix on the left and the
 host destination and scope beside it. Use **+** to add a rule, click a rule to
-edit its paths and scope, or use its trash button to remove it.
+edit its paths and contexts, or use its trash button to remove it. The
+contexts are chosen with the same picker as for breakpoints and symbol files.
 The context menu has **Move Rule
 Up/Down** to change priority. Changes apply immediately and refresh the call
 stack; rules created by **Locate Source File...** appear here too.

@@ -45,8 +45,7 @@ test("launchFields reads the simics-target-debug attributes from package.json", 
         [
             ["source", "string", true, undefined],
             ["destination", "string", true, "fileOrFolder"],
-            ["context", "string", undefined, undefined],
-            ["contextQuery", "string", undefined, undefined],
+            ["contexts", "contextScope", undefined, undefined],
         ],
     );
     const symbolFiles = fields.find((f) => f.key === "symbolFiles");

@@ -1,5 +1,13 @@
 import * as vscode from "vscode";
-import { ContextChoice, ContextScope, TargetContext, contextChoices, pickedValues } from "./contextChoices";
+import {
+    ContextChoice,
+    ContextScope,
+    ScopeMenuItem,
+    TargetContext,
+    contextChoices,
+    pickedValues,
+    scopeMenuItems,
+} from "./contextChoices";
 
 /**
  * The contexts of a session to pick from: the cores (contexts with state),
@@ -18,52 +26,83 @@ export interface PickContextsOptions {
     contexts: readonly TargetContext[];
     /** The scope to start with. */
     scope: ContextScope;
-    /** A context to list first, such as the one selected in the Call Stack view. */
+    /** A context to offer first, such as the one selected in the Call Stack view. */
     selectedId?: string;
+    /** The placeholder of the checklist. */
     placeholder?: string;
-    /** Offer a button to enter a TCF context query instead of checking contexts. */
-    allowQuery?: boolean;
     /** Offer typed text as a context ID or name to check, for contexts that are not listed. */
     allowTyped?: boolean;
 }
 
-/** The scope picked, or what was entered when the user switched to the other way of picking. */
-type Step<T> = { scope: ContextScope } | { switched: T } | undefined;
-
-const QUERY_BUTTON: vscode.QuickInputButton = {
-    iconPath: new vscode.ThemeIcon("filter"),
-    tooltip: "Use a Context Query Instead",
-};
-const CONTEXTS_BUTTON: vscode.QuickInputButton = {
-    iconPath: new vscode.ThemeIcon("checklist"),
-    tooltip: "Check Contexts Instead",
-};
+/** The scope picked, Back, or undefined when cancelled. */
+type Step<T> = { scope: ContextScope } | { back: T } | undefined;
 
 /**
- * Lets the user check the contexts something applies to, or enter a context
- * query when `allowQuery` is set. No checked context means all contexts.
- * Returns undefined if cancelled.
+ * Lets the user choose the contexts something applies to: first all
+ * contexts, the selected call-stack context or the current scope, or the
+ * steps to check contexts or enter a TCF context query. Those steps have a
+ * Back button to the first one. Returns undefined if cancelled.
  */
 export async function pickContexts(options: PickContextsOptions): Promise<ContextScope | undefined> {
-    let byQuery = "contextQuery" in options.scope;
-    let contexts = "contexts" in options.scope ? options.scope.contexts : [];
+    let checked = "contexts" in options.scope ? options.scope.contexts : [];
     let query = "contextQuery" in options.scope ? options.scope.contextQuery : "";
     for (;;) {
-        if (byQuery) {
+        const action = await chooseScope(options);
+        if (action === undefined || "scope" in action) {
+            return action?.scope;
+        }
+        if (action.step === "pick") {
+            const step = await check(options, checked);
+            if (step === undefined || "scope" in step) {
+                return step?.scope;
+            }
+            checked = step.back;
+        } else {
             const step = await enterQuery(options, query);
             if (step === undefined || "scope" in step) {
                 return step?.scope;
             }
-            query = step.switched;
-        } else {
-            const step = await check(options, contexts);
-            if (step === undefined || "scope" in step) {
-                return step?.scope;
-            }
-            contexts = step.switched;
+            query = step.back;
         }
-        byQuery = !byQuery;
     }
+}
+
+type MenuItem = vscode.QuickPickItem & { action: ScopeMenuItem["action"] };
+
+function chooseScope(options: PickContextsOptions): Promise<MenuItem["action"] | undefined> {
+    return new Promise((resolve) => {
+        const picker = vscode.window.createQuickPick<MenuItem>();
+        picker.title = options.title;
+        picker.placeholder = "Choose the contexts it applies to";
+        picker.matchOnDescription = true;
+        const menu = scopeMenuItems(options.scope, options.contexts, options.selectedId);
+        const items: MenuItem[] = menu.map(({ label, description, action }) => ({ label, description, action }));
+        picker.items = items;
+        const active = items[menu.findIndex((item) => item.active)];
+        if (active) {
+            picker.activeItems = [active];
+        }
+        let finished = false;
+
+        function finish(action: MenuItem["action"] | undefined): void {
+            if (finished) {
+                return;
+            }
+            finished = true;
+            picker.hide();
+            picker.dispose();
+            resolve(action);
+        }
+
+        picker.onDidAccept(() => {
+            const item = picker.activeItems[0];
+            if (item) {
+                finish(item.action);
+            }
+        });
+        picker.onDidHide(() => finish(undefined));
+        picker.show();
+    });
 }
 
 type Item = ContextChoice & vscode.QuickPickItem;
@@ -72,11 +111,11 @@ function check(options: PickContextsOptions, initial: readonly string[]): Promis
     return new Promise((resolve) => {
         const picker = vscode.window.createQuickPick<Item>();
         picker.title = options.title;
-        picker.placeholder = options.placeholder ?? "Check the contexts, or check none for all contexts";
+        picker.placeholder = options.placeholder ?? "Check one or more contexts";
         picker.canSelectMany = true;
         picker.matchOnDescription = true;
         picker.matchOnDetail = true;
-        picker.buttons = options.allowQuery ? [QUERY_BUTTON] : [];
+        picker.buttons = [vscode.QuickInputButtons.Back];
         let finished = false;
 
         function finish(step: Step<string[]>): void {
@@ -125,7 +164,7 @@ function check(options: PickContextsOptions, initial: readonly string[]): Promis
         if (options.allowTyped) {
             picker.onDidChangeValue(() => update(pickedValues(picker.selectedItems)));
         }
-        picker.onDidTriggerButton(() => finish({ switched: pickedValues(picker.selectedItems) }));
+        picker.onDidTriggerButton(() => finish({ back: pickedValues(picker.selectedItems) }));
         picker.onDidAccept(() => {
             const picked = pickedValues(picker.selectedItems);
             if (typedItem && typedOnly && !picked.includes(typedItem.value)) {
@@ -143,10 +182,10 @@ function enterQuery(options: PickContextsOptions, initial: string): Promise<Step
     return new Promise((resolve) => {
         const input = vscode.window.createInputBox();
         input.title = options.title;
-        input.prompt = "TCF context query, for example **/HasState=true";
+        input.prompt = "TCF context query";
         input.placeholder = "Context query";
         input.value = initial;
-        input.buttons = [CONTEXTS_BUTTON];
+        input.buttons = [vscode.QuickInputButtons.Back];
         let finished = false;
 
         function finish(step: Step<string>): void {
@@ -162,11 +201,11 @@ function enterQuery(options: PickContextsOptions, initial: string): Promise<Step
         input.onDidChangeValue(() => {
             input.validationMessage = undefined;
         });
-        input.onDidTriggerButton(() => finish({ switched: input.value.trim() }));
+        input.onDidTriggerButton(() => finish({ back: input.value.trim() }));
         input.onDidAccept(() => {
             const query = input.value.trim();
             if (!query) {
-                input.validationMessage = "Enter a context query, or use the button to check contexts";
+                input.validationMessage = "Enter a context query";
                 return;
             }
             finish({ scope: { contextQuery: query } });

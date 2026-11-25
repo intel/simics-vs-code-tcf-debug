@@ -80,13 +80,19 @@ function fakeHost(threads: string[]): BreakpointHost & { events: unknown[] } {
 }
 
 test("function breakpoint names preserve explicit context scopes", async () => {
-    assert.deepEqual(parseFunctionBreakpointName(formatFunctionBreakpointName("start_kernel", ["cpu0"])), {
-        location: "start_kernel",
-        contextIds: ["cpu0"],
-        hasContextDelimiter: true,
-        hasEmptyContext: false,
-    });
-    assert.equal(formatFunctionBreakpointName("start_kernel", ["cpu0", "cpu1"]), "start_kernel @ cpu0, cpu1");
+    assert.deepEqual(
+        parseFunctionBreakpointName(formatFunctionBreakpointName("start_kernel", { contexts: ["cpu0"] })),
+        {
+            location: "start_kernel",
+            contextIds: ["cpu0"],
+            hasContextDelimiter: true,
+            hasEmptyContext: false,
+        },
+    );
+    assert.equal(
+        formatFunctionBreakpointName("start_kernel", { contexts: ["cpu0", "cpu1"] }),
+        "start_kernel @ cpu0, cpu1",
+    );
     assert.deepEqual(parseFunctionBreakpointName("start_kernel @ cpu0,cpu1 , cpu0"), {
         location: "start_kernel",
         contextIds: ["cpu0", "cpu1"],
@@ -119,6 +125,40 @@ test("function breakpoint names preserve explicit context scopes", async () => {
     const changed = agent.commands.find(([command]) => command === "change")?.[1] as BreakpointProperties;
     assert.equal(changed.ID, properties[0].ID);
     assert.deepEqual(changed.ContextIds, properties[0].ContextIds);
+});
+
+// " @? " gives a context query, which may itself contain " @ ".
+test("function breakpoint names can have a context query", async () => {
+    const name = formatFunctionBreakpointName("start_kernel", { contextQuery: 'Name="a @ b"' });
+    assert.equal(name, 'start_kernel @? Name="a @ b"');
+    assert.deepEqual(parseFunctionBreakpointName(name), {
+        location: "start_kernel",
+        contextIds: [],
+        contextQuery: 'Name="a @ b"',
+        hasContextDelimiter: true,
+        hasEmptyContext: false,
+    });
+    const agent = fakeAgent();
+    const manager = new BreakpointManager(agent.service, fakeHost(["thread1"]));
+    const [planted, empty] = await manager.setFunctionBreakpoints([
+        { name: "start_kernel @? **/HasState=true" },
+        { name: "start_kernel @? " },
+    ]);
+    assert.equal(planted.verified, true);
+    assert.match(empty.message ?? "", /symbol @\? context query/);
+    const properties = agent.commands.map(([, props]) => props as BreakpointProperties);
+    assert.equal(properties.length, 1);
+    assert.equal(properties[0].Location, "start_kernel");
+    assert.equal(properties[0].ContextQuery, "**/HasState=true");
+    assert.equal(properties[0].ContextIds, undefined);
+
+    const old = fakeAgent();
+    old.caps.ContextQuery = false;
+    const [unsupported] = await new BreakpointManager(old.service, fakeHost(["thread1"])).setFunctionBreakpoints([
+        { name: "start_kernel @? **/HasState=true" },
+    ]);
+    assert.match(unsupported.message ?? "", /ContextQuery support/);
+    assert.equal(old.commands.length, 0);
 });
 
 test("scoped function breakpoints never fall back to global planting", async () => {

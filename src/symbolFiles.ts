@@ -1,4 +1,5 @@
 import * as fs from "fs";
+import type { ContextScope } from "./contextChoices";
 import { toBigInt } from "./tcf/json";
 import { MemoryMapService, MemoryRegionProperties } from "./tcf/services/memoryMap";
 
@@ -38,16 +39,22 @@ export interface SymbolFile {
     absolute?: true;
 }
 
-/** The context IDs to set a function breakpoint in for the symbol file's contexts. */
-export function symbolFileBreakpointContexts(
-    file: Pick<SymbolFileConfig, "contexts">,
+/**
+ * The scope of a function breakpoint for the symbol file: the IDs of its
+ * contexts, or its context query.
+ */
+export function symbolFileBreakpointScope(
+    file: Pick<SymbolFileConfig, "contexts" | "contextQuery">,
     contexts: readonly { id: string; name: string }[],
-): string[] {
+): ContextScope {
+    if (file.contextQuery) {
+        return { contextQuery: file.contextQuery };
+    }
     const scope = file.contexts ?? [];
     if (scope.length === 0) {
         throw new Error("The symbol file has no contexts");
     }
-    return [
+    const ids = [
         ...new Set(
             scope.map((entry) => {
                 const exact = contexts.find((context) => context.id === entry);
@@ -66,6 +73,7 @@ export function symbolFileBreakpointContexts(
             }),
         ),
     ];
+    return { contexts: ids };
 }
 
 /** The symbol file as a "symbolFiles" entry of a debug configuration, with the address as a string. */

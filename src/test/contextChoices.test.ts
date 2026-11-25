@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { contextChoices, describeContextScope, parseContextList, pickedValues } from "@/contextChoices";
+import { contextChoices, describeContextScope, parseContextList, pickedValues, scopeMenuItems } from "@/contextChoices";
 
 const CONTEXTS = [
     { id: "core-0", name: "board.cpu0" },
@@ -43,4 +43,28 @@ test("parseContextList and describeContextScope", () => {
     assert.equal(describeContextScope({}), "all contexts");
     assert.equal(describeContextScope({ contexts: ["cpu0", "cpu1"] }), "cpu0, cpu1");
     assert.equal(describeContextScope({ contextQuery: "**/HasState=true" }), "contexts matching **/HasState=true");
+});
+
+// The menu starts on the item for the current scope. Another scope than all
+// or the selected context gets an item of its own at the top.
+test("scopeMenuItems offers the current scope, all, the selected context, pick and query", () => {
+    const menu = (scope: Parameters<typeof scopeMenuItems>[0], selectedId?: string) =>
+        scopeMenuItems(scope, CONTEXTS, selectedId).map((item) => [item.label, item.active ?? false]);
+    assert.deepEqual(menu({ contexts: [] }, "core-1"), [
+        ["$(globe) All contexts", true],
+        ["$(debug-stackframe) board.cpu1", false],
+        ["$(checklist) Pick Contexts...", false],
+        ["$(filter) Context Query...", false],
+    ]);
+    assert.deepEqual(menu({ contexts: ["core-1"] }, "core-1").slice(0, 2), [
+        ["$(globe) All contexts", false],
+        ["$(debug-stackframe) board.cpu1", true],
+    ]);
+    assert.deepEqual(menu({ contexts: ["core-0", "gone"] }).slice(0, 2), [
+        ["$(check) board.cpu0, gone", true],
+        ["$(globe) All contexts", false],
+    ]);
+    const [current] = scopeMenuItems({ contextQuery: "HasState=true" }, CONTEXTS);
+    assert.equal(current.label, "$(check) Contexts matching HasState=true");
+    assert.deepEqual(current.action, { scope: { contextQuery: "HasState=true" } });
 });

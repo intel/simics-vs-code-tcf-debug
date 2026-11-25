@@ -8,7 +8,11 @@ import { parseInstructionReference } from "./disassembly";
 import { registerFunctionHeaderFileSystem } from "./functionHeaderFileSystem";
 import { applyAndSave, registerLaunchSettings } from "./launchSettings/editorProvider";
 import { setNamedConfigurationValue } from "./launchSettings/launchJson";
-import { formatFunctionBreakpointName, parseFunctionBreakpointName } from "./functionBreakpoint";
+import {
+    formatFunctionBreakpointName,
+    functionBreakpointScope,
+    parseFunctionBreakpointName,
+} from "./functionBreakpoint";
 import { ContextScope, TargetContext, describeContextScope } from "./contextChoices";
 import { listContexts, pickContexts } from "./contextPicker";
 import { MissingSource, SourceLocator } from "./locateSource";
@@ -19,7 +23,7 @@ import {
     ForeignSymbolFile,
     SymbolFileConfig,
     describeForeignSymbolFile,
-    symbolFileBreakpointContexts,
+    symbolFileBreakpointScope,
 } from "./symbolFiles";
 import { suggestSymbolPaths } from "./symbolPath";
 import { registerConsolesView } from "./consolesView";
@@ -261,26 +265,26 @@ async function addFunctionBreakpointInContext(
     try {
         const contexts = await listContexts(session, symbolFile !== undefined);
         const selected = contexts.find((context) => threadId !== undefined && context.threadId === threadId);
-        const contextIds = symbolFile
-            ? symbolFileBreakpointContexts(symbolFile.file, contexts)
+        const scope = symbolFile
+            ? symbolFileBreakpointScope(symbolFile.file, contexts)
             : await pickBreakpointContexts(
                   "Function Breakpoint Contexts",
                   contexts,
-                  selected ? [selected.id] : [],
+                  { contexts: selected ? [selected.id] : [] },
                   selected,
               );
-        if (!contextIds) {
+        if (!scope) {
             return;
         }
         const symbol = await vscode.window.showInputBox({
             title: "Add Function Breakpoint",
-            prompt: contextIds.length > 0 ? `Symbol in ${contextIds.join(", ")}` : "Symbol in all contexts",
+            prompt: `Symbol in ${describeContextScope(scope)}`,
             validateInput: (value) => (!value.trim() ? "Enter a symbol or expression" : undefined),
         });
         if (!symbol?.trim()) {
             return;
         }
-        const name = formatFunctionBreakpointName(symbol.trim(), contextIds);
+        const name = formatFunctionBreakpointName(symbol.trim(), scope);
         if (
             !vscode.debug.breakpoints.some((bp) => bp instanceof vscode.FunctionBreakpoint && bp.functionName === name)
         ) {
@@ -293,21 +297,20 @@ async function addFunctionBreakpointInContext(
     }
 }
 
-/** Returns the checked context IDs, empty for all contexts, or undefined if cancelled. */
-async function pickBreakpointContexts(
+/** Returns the context IDs (empty for all contexts) or context query, or undefined if cancelled. */
+function pickBreakpointContexts(
     title: string,
     contexts: TargetContext[],
-    checked: string[],
+    scope: ContextScope,
     selected: TargetContext | undefined,
-): Promise<string[] | undefined> {
-    const scope = await pickContexts({
+): Promise<ContextScope | undefined> {
+    return pickContexts({
         title,
         contexts,
-        scope: { contexts: checked },
+        scope,
         selectedId: selected?.id,
-        placeholder: "Check the cores to stop in, or check none for all contexts",
+        placeholder: "Check the cores to stop in",
     });
-    return scope && "contexts" in scope ? scope.contexts : undefined;
 }
 
 /**
@@ -353,7 +356,8 @@ async function editFunctionBreakpointContexts(): Promise<void> {
     if (!breakpoint) {
         return;
     }
-    const { location, contextIds } = parseFunctionBreakpointName(breakpoint.functionName);
+    const parsed = parseFunctionBreakpointName(breakpoint.functionName);
+    const { location } = parsed;
     if (!location) {
         void vscode.window.showErrorMessage(`'${breakpoint.functionName}' has no symbol to scope.`);
         return;
@@ -362,11 +366,16 @@ async function editFunctionBreakpointContexts(): Promise<void> {
         const contexts = await listContexts(session);
         const threadId = active?.session.id === session.id ? active.threadId : undefined;
         const selected = contexts.find((context) => threadId !== undefined && context.threadId === threadId);
-        const ids = await pickBreakpointContexts(`Contexts for ${location}`, contexts, contextIds, selected);
-        if (!ids) {
+        const scope = await pickBreakpointContexts(
+            `Contexts for ${location}`,
+            contexts,
+            functionBreakpointScope(parsed),
+            selected,
+        );
+        if (!scope) {
             return;
         }
-        const name = formatFunctionBreakpointName(location, ids);
+        const name = formatFunctionBreakpointName(location, scope);
         if (name === breakpoint.functionName) {
             return;
         }
@@ -803,7 +812,6 @@ async function promptSymbolScope(session: vscode.DebugSession, scope: ContextSco
         scope,
         selectedId: contexts.find((context) => threadId !== undefined && context.threadId === threadId)?.id,
         placeholder: "Check the contexts the symbols apply to, or check none for all contexts",
-        allowQuery: true,
         allowTyped: true,
     });
 }
@@ -885,7 +893,7 @@ class SymbolFileViewItem extends vscode.TreeItem {
         readonly session: vscode.DebugSession,
     ) {
         super(path.basename(file.path));
-        this.contextValue = file.contexts?.length ? "symbolFile scoped" : "symbolFile";
+        this.contextValue = file.contexts?.length || file.contextQuery ? "symbolFile scoped" : "symbolFile";
         this.description = `${describeContextScope(file)}${loadAddressSuffix(file)}`;
         this.tooltip = `${file.path}\n${this.description}`;
         this.iconPath = new vscode.ThemeIcon("file-code");

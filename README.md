@@ -267,9 +267,11 @@ is not used, to stay within the TCF specification.
 
 Use **Simics Target Debug: Add Function Breakpoint in Context...** from the
 Command Palette, the Breakpoints toolbar, or a stack frame's context menu to
-check one or more cores before entering the symbol. The selected call-stack
-context is listed first and checked; accept with nothing checked to keep the
-breakpoint global. Scoped entries appear as
+choose the contexts before entering the symbol. A menu offers **All
+contexts**, the selected call-stack context (chosen by default), **Pick
+Contexts...** to check one or more cores, and **Context Query...** to enter a
+TCF context query. The last two have a Back button to the menu. Scoped
+entries appear as
 `start_kernel @ armv8.cluster[0].core[0]` in the Breakpoints panel, or with a
 comma-separated list such as
 `start_kernel @ armv8.cluster[0].core[0], armv8.cluster[0].core[1]` when
@@ -278,26 +280,30 @@ context IDs, which are sent as the breakpoint's `ContextIds` and saved with
 the breakpoint; selecting another frame does not change its scope. Context IDs
 that contain commas cannot be used. The same syntax can be entered or edited
 using the built-in function-breakpoint `+` or **Edit Function Breakpoint...**.
-Scoped function breakpoints require the agent's `ContextIds` support and are
-never silently planted globally when it is unavailable. Their scope applies
+A context query is written after ` @? ` instead, such as
+`start_kernel @? **/HasState=true`, and is sent as the breakpoint's
+`ContextQuery`. Scoped function breakpoints require the agent's `ContextIds`
+or `ContextQuery` support and are never silently planted globally when it is
+unavailable. Their scope applies
 to those contexts (and, for a process context, its threads), not other cores.
 
 To change the contexts of an existing function breakpoint, use **Simics Target
 Debug: Edit Function Breakpoint Contexts...** from the Command Palette or the
 edit icon in the Breakpoints toolbar. VS Code does not tell extensions which
 breakpoint is selected in the Breakpoints panel, so the command asks for the
-function breakpoint when there is more than one. The checklist starts with the
-breakpoint's current contexts checked; contexts that are not in the current
-session stay listed so they are not dropped by accident. The breakpoint is
+function breakpoint when there is more than one. The menu starts on the
+breakpoint's current scope, and **Pick Contexts...** starts with its contexts
+checked; contexts that are not in the current session stay listed so they are
+not dropped by accident. The breakpoint is
 replaced by one with the new name and the same enabled state, condition, hit
 count, and log message, so it moves to the end of the Breakpoints panel.
 
-In **Symbol Files**, right-click a configured symbol file with contexts and
-select **Add Function Breakpoint...** to enter a symbol directly. The breakpoint
-uses the file's contexts rather than the selected call-stack core. Context names
-are resolved to exact TCF IDs; unavailable or ambiguous contexts produce an error
-instead of creating a global breakpoint. Files for all contexts or for a context
-query do not offer this action.
+In **Symbol Files**, right-click a configured symbol file with contexts or a
+context query and select **Add Function Breakpoint...** to enter a symbol
+directly. The breakpoint uses the file's contexts or query rather than the
+selected call-stack core. Context names are resolved to exact TCF IDs;
+unavailable or ambiguous contexts produce an error instead of creating a global
+breakpoint. Files for all contexts do not offer this action.
 
 An address only has a meaning in one address space, so an instruction
 breakpoint is limited to the process of the context shown in the Disassembly
@@ -561,7 +567,7 @@ buttons in the editor title switch between the form and the text of
   edited in the text.
 - The **Contexts** column of Symbol Files chooses all contexts, a list of
   context IDs or names separated by commas, or a context query. Its checklist
-  button picks them with the checklist of the Symbol Files view, from the
+  button picks them with the picker of the Symbol Files view, from the
   contexts of a running debug session to the configuration's agent; without
   one, type them. Changing the contexts writes `contexts` or `contextQuery`
   and removes the old single `context`.
@@ -632,11 +638,10 @@ folders are suggested; select a folder to browse it, or enter a path directly
 if the file is only available to the agent. The contexts are picked with the
 same checklist as for function breakpoints: it lists the cores returned by the
 agent's `ContextQuery.query("HasState=true")` (or stateful RunControl contexts
-if that service is unavailable), with the selected call-stack context first.
-Check one or more of them, or none for all contexts. Checking a listed context
-uses its ID; type an ID or name that is not listed to check it too. The filter
-button in its title bar switches to entering a TCF context query instead, and
-the checklist button there switches back. New entries are added to those from
+if that service is unavailable). Choose **All contexts**, the selected
+call-stack context, **Pick Contexts...** to check one or more, or **Context
+Query...** to enter a TCF context query. Checking a listed context uses its
+ID; type an ID or name that is not listed to check it too. New entries are added to those from
 `symbolFiles` for the running session only unless explicitly saved. Use the
 pencil action on a file in the Symbol Files view to edit its path, contexts
 (or context query), or load address. The same view lets you reload or remove a

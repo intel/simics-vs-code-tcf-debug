@@ -292,12 +292,12 @@ session stay listed so they are not dropped by accident. The breakpoint is
 replaced by one with the new name and the same enabled state, condition, hit
 count, and log message, so it moves to the end of the Breakpoints panel.
 
-In **Symbol Files**, right-click a configured symbol file with a context and
+In **Symbol Files**, right-click a configured symbol file with contexts and
 select **Add Function Breakpoint...** to enter a symbol directly. The breakpoint
-uses the file's context rather than the selected call-stack core. Context names
+uses the file's contexts rather than the selected call-stack core. Context names
 are resolved to exact TCF IDs; unavailable or ambiguous contexts produce an error
-instead of creating a global breakpoint. Files without a context do not offer
-this action.
+instead of creating a global breakpoint. Files for all contexts or for a context
+query do not offer this action.
 
 An address only has a meaning in one address space, so an instruction
 breakpoint is limited to the process of the context shown in the Disassembly
@@ -559,6 +559,12 @@ buttons in the editor title switch between the form and the text of
   under **Advanced** at the end, with `connectTimeout`. Others, like
   `preLaunchTask`, are listed under **Other Attributes** when set, and can be
   edited in the text.
+- The **Contexts** column of Symbol Files chooses all contexts, a list of
+  context IDs or names separated by commas, or a context query. Its checklist
+  button picks them with the checklist of the Symbol Files view, from the
+  contexts of a running debug session to the configuration's agent; without
+  one, type them. Changing the contexts writes `contexts` or `contextQuery`
+  and removes the old single `context`.
 - The options that apply to all configurations are [settings](#settings),
   see the link at the end of the form.
 
@@ -577,7 +583,7 @@ addition to) `add-symbol-file` in Simics:
   "port": 1534,
   "symbolFiles": [
     { "path": "${workspaceFolder}/build/firmware.elf" },
-    { "path": "build/app.elf", "context": "board.mb.cpu0.core[0][0]" },
+    { "path": "build/app.elf", "contexts": ["board.mb.cpu0.core[0][0]", "board.mb.cpu0.core[0][1]"] },
     { "path": "build/driver.elf", "contextQuery": "**/HasState=true", "address": "0x40000000" },
     { "path": "build/module.elf", "address": "0xff000", "absolute": true }
   ]
@@ -587,13 +593,15 @@ addition to) `add-symbol-file` in Simics:
 | Property       | Description |
 |----------------|-------------|
 | `path`         | The symbol file (ELF with debug information), as seen by the agent. Relative paths are relative to the workspace folder. |
-| `context`      | ID or name of the context the symbols apply to. |
+| `contexts`     | IDs or names of the contexts the symbols apply to. |
 | `contextQuery` | A TCF context query selecting the contexts the symbols apply to, for example `**/HasState=true` for all processors. |
+| `context`      | Deprecated: one context ID or name, the same as `contexts` with one entry. |
 | `address`      | Relocation offset added to all addresses in the file, like the Simics command `add-symbol-file -relative`. It may be negative, for example `"-0x1000"`. If not set, the addresses in the file are used. With `absolute`, a load address instead, see below. |
 | `absolute`     | If `true`, `address` is a load address: the symbols are relocated so that the loadable segment with the lowest file offset (normally the first one, see `readelf -lW`) is at this address. |
 
-Without `context` and `contextQuery` the symbols apply to all contexts. Both
-can be combined.
+Without `contexts` and `contextQuery` the symbols apply to all contexts. Set
+only one of them; an entry with both is ignored with an error in the Debug
+Console.
 
 The two ways of relocating differ in what the address refers to. For a file
 whose first loadable segment is linked at 0x3ff000, with `.text` at 0x400000:
@@ -606,8 +614,9 @@ whose first loadable segment is linked at 0x3ff000, with `.text` at 0x400000:
 
 This works like "Load symbols" in the Eclipse TCF client: each file becomes a
 memory map region that is sent to the agent with `MemoryMap.set` when
-attaching, for the given context or for all contexts (`""`) with a
-`ContextQuery`. The region has the `FileName`, plus the standard `BaseAddress`
+attaching, for each of the given contexts or for all contexts (`""`) with a
+`ContextQuery`. `MemoryMap.set` takes a single context, so a file with several
+contexts is set in the memory map of each one. The region has the `FileName`, plus the standard `BaseAddress`
 property for an offset (which is what Simics `add-symbol-file -relative` uses
 too) or `Addr` for an absolute load address. The agent removes the regions
 when the debug session ends. File names in the memory map are translated with
@@ -615,19 +624,22 @@ the path map rules, so `pathMap` also applies to symbol files.
 
 To add a symbol file after attaching, open **Symbol Files** in Run and Debug
 and use its **+** button (or **Simics Target Debug: Add Symbol File...** in the
-Command Palette). Enter the path as seen by the agent, an optional context
-ID/name and context query, and how the symbols are placed: the file addresses,
-a relocation offset (like `-relative`), or an absolute load address. Relative
-paths are resolved against the debug session's workspace folder. As you type
-the path, local files and folders are suggested; select a folder to browse it,
-or enter a path directly if the file is only available to the agent. The
-context picker suggests cores returned by the agent's
-`ContextQuery.query("HasState=true")` (or stateful RunControl contexts if that
-service is unavailable). Selecting one uses its ID; you can also enter a name
-directly or select **All contexts**. New entries are added to those from
+Command Palette). Enter the path as seen by the agent, the contexts, and how
+the symbols are placed: the file addresses, a relocation offset (like
+`-relative`), or an absolute load address. Relative paths are resolved against
+the debug session's workspace folder. As you type the path, local files and
+folders are suggested; select a folder to browse it, or enter a path directly
+if the file is only available to the agent. The contexts are picked with the
+same checklist as for function breakpoints: it lists the cores returned by the
+agent's `ContextQuery.query("HasState=true")` (or stateful RunControl contexts
+if that service is unavailable), with the selected call-stack context first.
+Check one or more of them, or none for all contexts. Checking a listed context
+uses its ID; type an ID or name that is not listed to check it too. The filter
+button in its title bar switches to entering a TCF context query instead, and
+the checklist button there switches back. New entries are added to those from
 `symbolFiles` for the running session only unless explicitly saved. Use the
-pencil action on a file in the Symbol Files view to edit its path, context,
-context query, or load address. The same view lets you reload or remove a
+pencil action on a file in the Symbol Files view to edit its path, contexts
+(or context query), or load address. The same view lets you reload or remove a
 mapping. If a configured file is missing on the VS Code host at startup, a
 warning offers to update its path using the file picker. The file may still
 exist on a remote TCF agent, so the warning can be dismissed. Mapping edits
@@ -640,7 +652,7 @@ Use **Save Symbol Files to Debug Configuration** (the save button in the
 Symbol Files view, also available in the Command Palette) to persist the
 session's current list. After confirmation, it replaces `symbolFiles` in
 the active session's uniquely named workspace configuration in
-`.vscode/launch.json`, including removals, context IDs, context queries,
+`.vscode/launch.json`, including removals, contexts, context queries,
 relocation offsets, and absolute load addresses. Saving an empty list clears
 the configured symbol files. Paths are saved as reported by the session,
 since symbol files are opened on the agent and may not exist on this host.

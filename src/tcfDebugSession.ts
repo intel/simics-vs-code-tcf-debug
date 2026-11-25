@@ -50,7 +50,10 @@ import {
     collectForeignSymbolFiles,
     formatSymbolFileAddress,
     parseSymbolFilesConfig,
+    symbolFileConfig,
+    symbolFileMapContexts,
 } from "./symbolFiles";
+import { describeContextScope } from "./contextChoices";
 import { toBigInt } from "./tcf/json";
 import { scanMemory } from "./shared/targetMemory/search";
 import * as req from "./tcfRequests";
@@ -586,10 +589,7 @@ export class TcfDebugSession extends DebugSession {
         try {
             await this.applySymbolFiles(service, files);
             for (const f of files) {
-                const scope =
-                    [f.context && `context ${f.context}`, f.contextQuery && `contexts matching ${f.contextQuery}`]
-                        .filter(Boolean)
-                        .join(", ") || "all contexts";
+                const scope = describeContextScope(f);
                 const at =
                     f.address === undefined
                         ? ""
@@ -644,8 +644,7 @@ export class TcfDebugSession extends DebugSession {
                     ids = this.contextOrder.filter((id) => this.contexts.get(id)?.HasState === true);
                 }
                 response.body = ids.map((id) => {
-                    const threadId =
-                        command === "getFunctionBreakpointContexts" ? this.threadIdByCtx.get(id) : undefined;
+                    const threadId = this.threadIdByCtx.get(id);
                     return {
                         id,
                         name: this.contextDisplayName(id),
@@ -716,13 +715,7 @@ export class TcfDebugSession extends DebugSession {
         if (command === "getSymbolFiles") {
             response.body = {
                 supported: this.memoryMap !== undefined,
-                files: this.symbolFiles.map((file) => ({
-                    path: file.path,
-                    context: file.context,
-                    ...(file.contextQuery !== undefined && { contextQuery: file.contextQuery }),
-                    ...(file.address !== undefined && { address: file.address.toString() }),
-                    ...(file.absolute && { absolute: true }),
-                })),
+                files: this.symbolFiles.map(symbolFileConfig),
             };
             this.sendResponse(response);
             return;
@@ -790,10 +783,11 @@ export class TcfDebugSession extends DebugSession {
                     this.log(`Symbol file ${this.symbolFiles[index].path} removed\n`);
                     this.symbolFiles = nextFiles;
                 } else {
-                    const contexts =
+                    const files =
                         command === "reloadSymbolFile"
-                            ? [this.symbolFiles[this.symbolFileIndex(args)].context]
-                            : [...new Set(this.symbolFiles.map((file) => file.context))];
+                            ? [this.symbolFiles[this.symbolFileIndex(args)]]
+                            : this.symbolFiles;
+                    const contexts = [...new Set(files.flatMap(symbolFileMapContexts))];
                     for (const context of contexts) {
                         await service.set(context, []);
                     }
@@ -811,19 +805,21 @@ export class TcfDebugSession extends DebugSession {
             | {
                   index?: unknown;
                   path?: unknown;
-                  context?: unknown;
+                  contexts?: unknown;
                   contextQuery?: unknown;
                   address?: unknown;
                   absolute?: unknown;
               }
             | undefined;
         const index = selection?.index;
+        const contexts = Array.isArray(selection?.contexts) ? selection.contexts : [];
         if (
             typeof index !== "number" ||
             !Number.isInteger(index) ||
             index < 0 ||
             this.symbolFiles[index]?.path !== selection?.path ||
-            this.symbolFiles[index].context !== selection?.context ||
+            this.symbolFiles[index].contexts.length !== contexts.length ||
+            this.symbolFiles[index].contexts.some((context, i) => context !== contexts[i]) ||
             this.symbolFiles[index].contextQuery !== selection?.contextQuery ||
             this.symbolFiles[index].address?.toString() !== selection?.address ||
             (this.symbolFiles[index].absolute === true) !== (selection?.absolute === true)

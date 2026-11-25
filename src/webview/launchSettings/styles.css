@@ -371,6 +371,17 @@ button:disabled {
     max-width: none;
 }
 
+.context-scope {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.context-scope select {
+    flex: 1;
+    min-width: 0;
+}
+
 .fold-down {
     max-width: 800px;
     margin-top: 16px;

@@ -883,13 +883,24 @@
                                             "format": "file-path",
                                             "description": "Path of the symbol file, as seen by the agent. Relative paths are relative to the workspace folder."
                                         },
-                                        "context": {
-                                            "type": "string",
-                                            "description": "ID or name of the context the symbols apply to. If neither context nor contextQuery is set, the symbols apply to all contexts."
+                                        "contexts": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string",
+                                                "minLength": 1
+                                            },
+                                            "uniqueItems": true,
+                                            "description": "IDs or names of the contexts the symbols apply to. If neither contexts nor contextQuery is set, the symbols apply to all contexts."
                                         },
                                         "contextQuery": {
                                             "type": "string",
-                                            "description": "TCF context query selecting the contexts the symbols apply to, for example \"**/HasState=true\"."
+                                            "minLength": 1,
+                                            "description": "TCF context query selecting the contexts the symbols apply to, for example \"**/HasState=true\". Use either contexts or contextQuery, not both."
+                                        },
+                                        "context": {
+                                            "type": "string",
+                                            "description": "ID or name of the context the symbols apply to.",
+                                            "deprecationMessage": "Use \"contexts\" instead, a list of context IDs or names."
                                         },
                                         "address": {
                                             "type": [

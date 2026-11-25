@@ -14,8 +14,19 @@ import {
     setValue,
 } from "./launchJson";
 import { isContextSession } from "@/contextSessionManager";
+import { TargetContext } from "@/contextChoices";
+import { listContexts, pickContexts } from "@/contextPicker";
 import { StateMessage, WebviewMessage } from "./protocol";
-import { Field, agentAddress, fieldPath, launchFields, launchTemplate, valueAtPath } from "./schema";
+import {
+    Field,
+    agentAddress,
+    fieldPath,
+    launchFields,
+    launchTemplate,
+    readContextScope,
+    valueAtPath,
+    withContextScope,
+} from "./schema";
 
 /** Must match "customEditors" in package.json. */
 export const LAUNCH_SETTINGS_VIEW_TYPE = "simics-target-debug.launchSettings";
@@ -219,6 +230,9 @@ class LaunchSettingsEditorProvider implements vscode.CustomTextEditorProvider {
                 }
                 return;
             }
+            case "pickContexts":
+                await pickItemContexts(document, message.index, message.name, message.path);
+                return;
             case "start": {
                 const text = checkedText(document, message.index, message.name);
                 const config = readConfigurations(text).configurations?.find((c) => c.index === message.index);
@@ -292,6 +306,68 @@ class LaunchSettingsEditorProvider implements vscode.CustomTextEditorProvider {
             }
         }
     }
+}
+
+/**
+ * Lets the user pick the contexts of the list item at `path`, such as a
+ * symbol file, from those of a running session to the configuration's agent.
+ */
+async function pickItemContexts(
+    document: vscode.TextDocument,
+    index: number,
+    name: string,
+    itemPath: (string | number)[],
+): Promise<void> {
+    const read = (text: string) => {
+        const config = readConfigurations(text).configurations?.find((c) => c.index === index);
+        const value = valueAtPath(config?.values, itemPath);
+        const item =
+            typeof value === "object" && value !== null && !Array.isArray(value)
+                ? (value as Record<string, unknown>)
+                : undefined;
+        return { config, item };
+    };
+    const { config, item } = read(checkedText(document, index, name));
+    if (!config || !item) {
+        return;
+    }
+    const agent = agentAddress(config.values);
+    const session = [...tcfSessions].find((s) => agentAddress(s.configuration) === agent);
+    if (!session) {
+        void vscode.window.showInformationMessage(
+            `Start a Simics Target Debug session to ${agent} to pick from its contexts.`,
+        );
+        return;
+    }
+    let contexts: TargetContext[] = [];
+    try {
+        contexts = await listContexts(session);
+    } catch (err) {
+        void vscode.window.showWarningMessage(
+            `Could not list TCF contexts, type their IDs or names: ${err instanceof Error ? err.message : String(err)}`,
+        );
+    }
+    const file = item.path;
+    const scope = await pickContexts({
+        title: typeof file === "string" && file ? `Contexts for ${file}` : "Contexts",
+        contexts,
+        scope: readContextScope(item),
+        placeholder: "Check the contexts, or check none for all contexts",
+        allowQuery: true,
+        allowTyped: true,
+    });
+    if (scope === undefined) {
+        return;
+    }
+    const text = checkedText(document, index, name);
+    const current = read(text).item;
+    if (!current) {
+        throw new Error("launch.json changed while you edited it, please try again.");
+    }
+    await applyAndSave(
+        document,
+        setValue(text, index, itemPath, withContextScope(current, scope), detectFormatting(text)),
+    );
 }
 
 /** Loads `script`, a bundle in out/webview, with the form's stylesheet. */

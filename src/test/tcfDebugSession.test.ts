@@ -378,3 +378,56 @@ test("getForeignSymbolFiles lists files that the session did not add", async () 
         ],
     });
 });
+
+// A symbol file moved from one context to two is set in both maps, and the
+// map of the old context is cleared. getSymbolFiles reports "contexts", as
+// saved to launch.json.
+test("replaceSymbolFile moves a symbol file to several contexts", async () => {
+    const session = new TcfDebugSession();
+    const prefix = (session as unknown as { symbolFileIdPrefix: string }).symbolFileIdPrefix;
+    const calls: [string, unknown[]][] = [];
+    Object.assign(session, {
+        channel: {},
+        memoryMap: {
+            set: async (id: string, regions: unknown[]) => {
+                calls.push([id, regions]);
+            },
+        },
+        symbolFiles: [{ path: "/a.elf", contexts: ["cpu0"] }],
+    });
+    let seq = 0;
+    const request = (command: string, args: unknown) =>
+        new Promise<DebugProtocol.Response>((resolve) => {
+            const requestSeq = ++seq;
+            session.onDidSendMessage((value) => {
+                const message = value as DebugProtocol.Response;
+                if (message.type === "response" && message.request_seq === requestSeq) {
+                    resolve(message);
+                }
+            });
+            session.handleMessage({
+                seq: requestSeq,
+                type: "request",
+                command,
+                arguments: args,
+            } as DebugProtocol.Request);
+        });
+
+    const replaced = await request("replaceSymbolFile", {
+        index: 0,
+        path: "/a.elf",
+        contexts: ["cpu0"],
+        file: { path: "/a.elf", contexts: ["cpu1", "cpu2"] },
+    });
+    assert.equal(replaced.success, true);
+    const region = { ID: `${prefix}1`, FileName: "/a.elf" };
+    assert.deepEqual(calls, [
+        ["cpu1", [region]],
+        ["cpu2", [region]],
+        ["cpu0", []],
+    ]);
+    const stale = await request("removeSymbolFile", { index: 0, path: "/a.elf", contexts: ["cpu0"] });
+    assert.equal(stale.success, false);
+    const listed = await request("getSymbolFiles", undefined);
+    assert.deepEqual(listed.body, { supported: true, files: [{ path: "/a.elf", contexts: ["cpu1", "cpu2"] }] });
+});

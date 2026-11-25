@@ -8,13 +8,9 @@ import { parseInstructionReference } from "./disassembly";
 import { registerFunctionHeaderFileSystem } from "./functionHeaderFileSystem";
 import { applyAndSave, registerLaunchSettings } from "./launchSettings/editorProvider";
 import { setNamedConfigurationValue } from "./launchSettings/launchJson";
-import {
-    FunctionBreakpointContext,
-    FunctionBreakpointContextChoice,
-    formatFunctionBreakpointName,
-    functionBreakpointContextChoices,
-    parseFunctionBreakpointName,
-} from "./functionBreakpoint";
+import { formatFunctionBreakpointName, parseFunctionBreakpointName } from "./functionBreakpoint";
+import { ContextScope, TargetContext, describeContextScope } from "./contextChoices";
+import { listContexts, pickContexts } from "./contextPicker";
 import { MissingSource, SourceLocator } from "./locateSource";
 import { pathMapProblems } from "./pathMapper";
 import { registerPathMapView } from "./pathMapView";
@@ -23,7 +19,7 @@ import {
     ForeignSymbolFile,
     SymbolFileConfig,
     describeForeignSymbolFile,
-    symbolFileBreakpointContext,
+    symbolFileBreakpointContexts,
 } from "./symbolFiles";
 import { suggestSymbolPaths } from "./symbolPath";
 import { registerConsolesView } from "./consolesView";
@@ -263,13 +259,15 @@ async function addFunctionBreakpointInContext(
     }
     const threadId = frame?.threadId ?? (active?.session.id === session.id ? active.threadId : undefined);
     try {
-        const contexts = await functionBreakpointContexts(session, symbolFile !== undefined);
+        const contexts = await listContexts(session, symbolFile !== undefined);
         const selected = contexts.find((context) => threadId !== undefined && context.threadId === threadId);
         const contextIds = symbolFile
-            ? [symbolFileBreakpointContext(symbolFile.file, contexts)]
-            : await pickFunctionBreakpointContexts(
+            ? symbolFileBreakpointContexts(symbolFile.file, contexts)
+            : await pickBreakpointContexts(
                   "Function Breakpoint Contexts",
-                  functionBreakpointContextChoices(contexts, selected ? [selected.id] : [], selected?.id),
+                  contexts,
+                  selected ? [selected.id] : [],
+                  selected,
               );
         if (!contextIds) {
             return;
@@ -295,29 +293,21 @@ async function addFunctionBreakpointInContext(
     }
 }
 
-function functionBreakpointContexts(
-    session: vscode.DebugSession,
-    includeContainers: boolean,
-): Promise<(FunctionBreakpointContext & { threadId?: number })[]> {
-    return session.customRequest(
-        "getFunctionBreakpointContexts",
-        includeContainers ? { includeContainers: true } : undefined,
-    ) as Promise<(FunctionBreakpointContext & { threadId?: number })[]>;
-}
-
 /** Returns the checked context IDs, empty for all contexts, or undefined if cancelled. */
-async function pickFunctionBreakpointContexts(
+async function pickBreakpointContexts(
     title: string,
-    choices: FunctionBreakpointContextChoice[],
+    contexts: TargetContext[],
+    checked: string[],
+    selected: TargetContext | undefined,
 ): Promise<string[] | undefined> {
-    const picked = await vscode.window.showQuickPick(choices, {
+    const scope = await pickContexts({
         title,
-        placeHolder: "Check the cores to stop in, or check none for all contexts",
-        canPickMany: true,
-        matchOnDescription: true,
-        matchOnDetail: true,
+        contexts,
+        scope: { contexts: checked },
+        selectedId: selected?.id,
+        placeholder: "Check the cores to stop in, or check none for all contexts",
     });
-    return picked?.map((choice) => choice.id);
+    return scope && "contexts" in scope ? scope.contexts : undefined;
 }
 
 /**
@@ -369,13 +359,10 @@ async function editFunctionBreakpointContexts(): Promise<void> {
         return;
     }
     try {
-        const contexts = await functionBreakpointContexts(session, false);
+        const contexts = await listContexts(session);
         const threadId = active?.session.id === session.id ? active.threadId : undefined;
         const selected = contexts.find((context) => threadId !== undefined && context.threadId === threadId);
-        const ids = await pickFunctionBreakpointContexts(
-            `Contexts for ${location}`,
-            functionBreakpointContextChoices(contexts, contextIds, selected?.id),
-        );
+        const ids = await pickBreakpointContexts(`Contexts for ${location}`, contexts, contextIds, selected);
         if (!ids) {
             return;
         }
@@ -417,15 +404,8 @@ async function addSymbolFile(symbolFiles: SymbolFilesProvider): Promise<void> {
     if (filePath === undefined) {
         return;
     }
-    const contextId = await promptSymbolContext(session);
-    if (contextId === undefined) {
-        return;
-    }
-    const contextQuery = await vscode.window.showInputBox({
-        title: "Context Query",
-        prompt: "Optional TCF context query, for example **/HasState=true",
-    });
-    if (contextQuery === undefined) {
+    const scope = await promptSymbolScope(session, { contexts: [] });
+    if (scope === undefined) {
         return;
     }
     const load = await promptLoadAddress();
@@ -439,8 +419,7 @@ async function addSymbolFile(symbolFiles: SymbolFilesProvider): Promise<void> {
             session.workspaceFolder && !path.isAbsolute(resolvedPath)
                 ? path.join(session.workspaceFolder.uri.fsPath, resolvedPath)
                 : resolvedPath,
-        ...(contextId.trim() && { context: contextId.trim() }),
-        ...(contextQuery.trim() && { contextQuery: contextQuery.trim() }),
+        ...scopeConfig(scope),
         ...load,
     };
     try {
@@ -641,8 +620,7 @@ async function editSymbolFile(item?: SymbolFileViewItem): Promise<void> {
     const selected = await vscode.window.showQuickPick(
         [
             { label: "Path", description: file.path, field: "path" },
-            { label: "Context", description: file.context || "All contexts", field: "context" },
-            { label: "Context Query", description: file.contextQuery || "None", field: "contextQuery" },
+            { label: "Contexts", description: capitalize(describeContextScope(file)), field: "contexts" },
             { label: "Load Address", description: describeLoadAddress(file), field: "address" },
         ],
         { title: "Edit Symbol Mapping", placeHolder: "Select a field to update" },
@@ -661,22 +639,17 @@ async function editSymbolFile(item?: SymbolFileViewItem): Promise<void> {
             session.workspaceFolder && !path.isAbsolute(trimmed)
                 ? path.join(session.workspaceFolder.uri.fsPath, trimmed)
                 : trimmed;
-    } else if (selected.field === "context") {
-        const contextId = await promptSymbolContext(session, file.context ?? "");
-        if (contextId === undefined) {
+    } else if (selected.field === "contexts") {
+        const scope = await promptSymbolScope(
+            session,
+            file.contextQuery !== undefined ? { contextQuery: file.contextQuery } : { contexts: file.contexts ?? [] },
+        );
+        if (scope === undefined) {
             return;
         }
-        updated.context = contextId.trim();
-    } else if (selected.field === "contextQuery") {
-        const contextQuery = await vscode.window.showInputBox({
-            title: "Context Query",
-            prompt: "Leave blank to remove the context query",
-            value: file.contextQuery ?? "",
-        });
-        if (contextQuery === undefined) {
-            return;
-        }
-        updated.contextQuery = contextQuery.trim() || undefined;
+        delete updated.contexts;
+        delete updated.contextQuery;
+        Object.assign(updated, scopeConfig(scope));
     } else {
         const load = await promptLoadAddress(file);
         if (load === undefined) {
@@ -691,7 +664,7 @@ async function editSymbolFile(item?: SymbolFileViewItem): Promise<void> {
     }
     if (
         updated.path === file.path &&
-        updated.context === file.context &&
+        (updated.contexts ?? []).join("\n") === (file.contexts ?? []).join("\n") &&
         updated.contextQuery === file.contextQuery &&
         updated.address === file.address &&
         (updated.absolute === true) === (file.absolute === true)
@@ -812,58 +785,39 @@ async function replaceSymbolFile(
     }
 }
 
-interface SymbolContextChoice extends vscode.QuickPickItem {
-    id: string;
-}
-
-async function promptSymbolContext(session: vscode.DebugSession, initialContext = ""): Promise<string | undefined> {
-    let contexts: { id: string; name: string }[];
+/** Asks which contexts a symbol file applies to. Returns undefined when cancelled. */
+async function promptSymbolScope(session: vscode.DebugSession, scope: ContextScope): Promise<ContextScope | undefined> {
+    let contexts: TargetContext[] = [];
     try {
-        contexts = (await session.customRequest("getSymbolContexts")) as { id: string; name: string }[];
+        contexts = await listContexts(session);
     } catch (err) {
         void vscode.window.showWarningMessage(
-            `Could not list TCF contexts: ${err instanceof Error ? err.message : String(err)}`,
+            `Could not list TCF contexts, type their IDs or names: ${err instanceof Error ? err.message : String(err)}`,
         );
-        return vscode.window.showInputBox({
-            title: "Context ID or Name",
-            prompt: "Leave blank to apply to all contexts",
-            value: initialContext,
-        });
     }
-    return new Promise((resolve) => {
-        const picker = vscode.window.createQuickPick<SymbolContextChoice>();
-        picker.title = "Context ID or Name";
-        picker.placeholder = "Choose a context, type an ID or name, or select All contexts";
-        picker.matchOnDescription = true;
-        let finished = false;
-
-        function finish(value?: string): void {
-            if (finished) {
-                return;
-            }
-            finished = true;
-            picker.hide();
-            picker.dispose();
-            resolve(value);
-        }
-
-        function update(value: string): void {
-            const typed = value.trim();
-            picker.items = [
-                typed
-                    ? { label: typed, description: "Use ID or name as entered", id: typed }
-                    : { label: "All contexts", description: "No context filter", id: "" },
-                ...contexts.map((context) => ({ label: context.name, description: context.id, id: context.id })),
-            ];
-        }
-
-        picker.onDidChangeValue(update);
-        picker.onDidAccept(() => finish(picker.activeItems[0]?.id ?? picker.value.trim()));
-        picker.onDidHide(() => finish());
-        picker.value = initialContext;
-        picker.show();
-        update(initialContext);
+    const active = vscode.debug.activeStackItem;
+    const threadId = active?.session.id === session.id ? active.threadId : undefined;
+    return pickContexts({
+        title: "Symbol File Contexts",
+        contexts,
+        scope,
+        selectedId: contexts.find((context) => threadId !== undefined && context.threadId === threadId)?.id,
+        placeholder: "Check the contexts the symbols apply to, or check none for all contexts",
+        allowQuery: true,
+        allowTyped: true,
     });
+}
+
+/** The "contexts" or "contextQuery" attribute of a symbol file for the scope. */
+function scopeConfig(scope: ContextScope): Pick<SymbolFileConfig, "contexts" | "contextQuery"> {
+    if ("contextQuery" in scope) {
+        return { contextQuery: scope.contextQuery };
+    }
+    return scope.contexts.length > 0 ? { contexts: scope.contexts } : {};
+}
+
+function capitalize(text: string): string {
+    return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 async function saveSymbolFiles(): Promise<void> {
@@ -931,12 +885,8 @@ class SymbolFileViewItem extends vscode.TreeItem {
         readonly session: vscode.DebugSession,
     ) {
         super(path.basename(file.path));
-        this.contextValue = file.context ? "symbolFile scoped" : "symbolFile";
-        const scope =
-            [file.context && `context ${file.context}`, file.contextQuery && `query ${file.contextQuery}`]
-                .filter(Boolean)
-                .join(", ") || "all contexts";
-        this.description = `${scope}${loadAddressSuffix(file)}`;
+        this.contextValue = file.contexts?.length ? "symbolFile scoped" : "symbolFile";
+        this.description = `${describeContextScope(file)}${loadAddressSuffix(file)}`;
         this.tooltip = `${file.path}\n${this.description}`;
         this.iconPath = new vscode.ThemeIcon("file-code");
     }

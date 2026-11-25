@@ -5,8 +5,18 @@
  * this file too.
  */
 
+import type { ContextScope } from "@/contextChoices";
+
 export type FieldKind =
-    "string" | "enum" | "number" | "integer" | "boolean" | "stringOrInteger" | "objectList" | "unsupported";
+    | "string"
+    | "enum"
+    | "number"
+    | "integer"
+    | "boolean"
+    | "stringOrInteger"
+    | "objectList"
+    | "contextScope"
+    | "unsupported";
 
 export interface Field {
     key: string;
@@ -21,7 +31,11 @@ export interface Field {
     values?: string[];
     /** Text to show for each of `values`, if not the values themselves. */
     valueLabels?: string[];
-    /** The properties of the objects in an 'objectList' field. */
+    /**
+     * The properties of the objects in an 'objectList' field. Objects with
+     * "contexts" (a list of strings) and "contextQuery" have one
+     * 'contextScope' column for both, see readContextScope.
+     */
     columns?: Field[];
     /**
      * What a path field may be set to with Browse buttons, from "format" in
@@ -195,6 +209,7 @@ interface Schema {
     items?: unknown;
     properties?: unknown;
     required?: unknown;
+    deprecationMessage?: unknown;
 }
 
 function field(key: string, schema: Schema, required: boolean): Field {
@@ -219,7 +234,7 @@ function field(key: string, schema: Schema, required: boolean): Field {
     }
     if (f.kind === "objectList") {
         const items = schema.items as Schema;
-        f.columns = fieldsFromSchema(items.properties as Record<string, unknown>, items.required);
+        f.columns = objectColumns(items.properties as Record<string, unknown>, items.required);
         // A list default in package.json is only a completion template.
         delete f.default;
     }
@@ -241,7 +256,7 @@ function kindOf(schema: Schema): FieldKind {
                 if (
                     items?.type === "object" &&
                     isObject(items.properties) &&
-                    fieldsFromSchema(items.properties).every((c) => SIMPLE_KINDS.has(c.kind))
+                    objectColumns(items.properties).every((c) => COLUMN_KINDS.has(c.kind))
                 ) {
                     return "objectList";
                 }
@@ -255,7 +270,79 @@ function kindOf(schema: Schema): FieldKind {
     return "unsupported";
 }
 
-const SIMPLE_KINDS = new Set<FieldKind>(["string", "enum", "number", "integer", "boolean", "stringOrInteger"]);
+const COLUMN_KINDS = new Set<FieldKind>([
+    "string",
+    "enum",
+    "number",
+    "integer",
+    "boolean",
+    "stringOrInteger",
+    "contextScope",
+]);
+
+/** The keys of the attributes a 'contextScope' column edits. "context" is the deprecated single context. */
+const CONTEXT_SCOPE_KEYS = ["contexts", "contextQuery", "context"];
+
+/**
+ * The columns of an object list: one per property, except deprecated ones,
+ * and with one 'contextScope' column for "contexts" and "contextQuery".
+ */
+function objectColumns(properties: Record<string, unknown>, required: unknown = []): Field[] {
+    const contexts = properties.contexts as Schema | undefined;
+    const hasScope =
+        contexts?.type === "array" &&
+        (contexts.items as Schema | undefined)?.type === "string" &&
+        (properties.contextQuery as Schema | undefined)?.type === "string";
+    return fieldsFromSchema(properties, required).flatMap((f) => {
+        if ((properties[f.key] as Schema | undefined)?.deprecationMessage !== undefined) {
+            return [];
+        }
+        if (hasScope && f.key === "contextQuery") {
+            return [];
+        }
+        if (hasScope && f.key === "contexts") {
+            return [{ ...f, kind: "contextScope" as const }];
+        }
+        return [f];
+    });
+}
+
+/** The contexts or context query of a list item with a 'contextScope' column. */
+export function readContextScope(item: unknown): ContextScope {
+    const v = isObject(item) ? item : {};
+    if (typeof v.contextQuery === "string" && v.contextQuery.length > 0) {
+        return { contextQuery: v.contextQuery };
+    }
+    if (Array.isArray(v.contexts)) {
+        return { contexts: v.contexts.filter((c): c is string => typeof c === "string" && c.length > 0) };
+    }
+    return { contexts: typeof v.context === "string" && v.context.length > 0 ? [v.context] : [] };
+}
+
+/**
+ * The list item with its scope attributes replaced by `scope`, where the
+ * first of them was, else after "path". All contexts leaves them out.
+ */
+export function withContextScope(item: Record<string, unknown>, scope: ContextScope): Record<string, unknown> {
+    const attributes: Record<string, unknown> =
+        "contextQuery" in scope
+            ? { contextQuery: scope.contextQuery }
+            : scope.contexts.length > 0
+              ? { contexts: scope.contexts }
+              : {};
+    const keys = Object.keys(item);
+    const after = keys.find((k) => CONTEXT_SCOPE_KEYS.includes(k)) ?? (keys.includes("path") ? "path" : undefined);
+    const result: Record<string, unknown> = after === undefined ? { ...attributes } : {};
+    for (const [key, value] of Object.entries(item)) {
+        if (!CONTEXT_SCOPE_KEYS.includes(key)) {
+            result[key] = value;
+        }
+        if (key === after) {
+            Object.assign(result, attributes);
+        }
+    }
+    return result;
+}
 
 interface DebuggerContribution {
     type?: unknown;

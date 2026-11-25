@@ -97,3 +97,61 @@ export function describeContextScope(scope: { contexts?: readonly string[]; cont
     }
     return scope.contexts && scope.contexts.length > 0 ? scope.contexts.join(", ") : "all contexts";
 }
+
+export interface ScopeMenuItem {
+    label: string;
+    description?: string;
+    /** A scope to accept at once, or the next step: the checklist or the context query input. */
+    action: { scope: ContextScope } | { step: "pick" | "query" };
+    /** The item that stands for the scope the menu starts with. */
+    active?: boolean;
+}
+
+/**
+ * The first step of the context picker: all contexts, the selected
+ * call-stack context, the current scope if it is neither of those, and the
+ * steps to check contexts or enter a context query. Labels have codicons.
+ */
+export function scopeMenuItems(
+    scope: ContextScope,
+    contexts: readonly TargetContext[],
+    selectedId?: string,
+): ScopeMenuItem[] {
+    const selected = contexts.find((context) => context.id === selectedId);
+    const checked = "contexts" in scope ? scope.contexts : [];
+    const isAll = "contexts" in scope && checked.length === 0;
+    const isSelected = selected !== undefined && checked.length === 1 && checked[0] === selected.id;
+    const items: ScopeMenuItem[] = [];
+    if (!isAll && !isSelected) {
+        const names = checked.map((entry) => contexts.find((context) => context.id === entry)?.name ?? entry);
+        items.push({
+            label: `$(check) ${"contextQuery" in scope ? `Contexts matching ${scope.contextQuery}` : names.join(", ")}`,
+            description: "Current",
+            action: { scope },
+            active: true,
+        });
+    }
+    items.push({
+        label: "$(globe) All contexts",
+        description: "No context filter",
+        action: { scope: { contexts: [] } },
+        active: isAll,
+    });
+    if (selected) {
+        items.push({
+            label: `$(debug-stackframe) ${selected.name}`,
+            description: `Selected call-stack context (${selected.id})`,
+            action: { scope: { contexts: [selected.id] } },
+            active: isSelected,
+        });
+    }
+    items.push(
+        { label: "$(checklist) Pick Contexts...", description: "Check one or more contexts", action: { step: "pick" } },
+        {
+            label: "$(filter) Context Query...",
+            description: "Enter a TCF context query",
+            action: { step: "query" },
+        },
+    );
+    return items;
+}

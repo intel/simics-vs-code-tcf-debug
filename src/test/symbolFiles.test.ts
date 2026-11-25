@@ -9,7 +9,7 @@ import {
     describeForeignSymbolFile,
     formatSymbolFileAddress,
     parseSymbolFilesConfig,
-    symbolFileBreakpointContexts,
+    symbolFileBreakpointScope,
     symbolFileConfig,
 } from "@/symbolFiles";
 import { MemoryMapService, MemoryRegionProperties } from "@/tcf/services/memoryMap";
@@ -157,17 +157,19 @@ test("applySymbolFiles sets the region in the map of each context", async () => 
     ]);
 });
 
-test("symbolFileBreakpointContexts resolves each context of the file", () => {
+test("symbolFileBreakpointScope resolves each context of the file, or uses its query", () => {
     const contexts = [
         { id: "core-0", name: "board.cpu0" },
         { id: "core-1", name: "board.cpu1" },
     ];
-    assert.deepEqual(symbolFileBreakpointContexts({ contexts: ["board.cpu1", "core-0", "core-1"] }, contexts), [
-        "core-1",
-        "core-0",
-    ]);
-    assert.throws(() => symbolFileBreakpointContexts({ contexts: [] }, contexts), /no contexts/);
-    assert.throws(() => symbolFileBreakpointContexts({ contexts: ["core-0", "gone"] }, contexts), /'gone' is not/);
+    assert.deepEqual(symbolFileBreakpointScope({ contexts: ["board.cpu1", "core-0", "core-1"] }, contexts), {
+        contexts: ["core-1", "core-0"],
+    });
+    assert.deepEqual(symbolFileBreakpointScope({ contextQuery: "HasState=true" }, contexts), {
+        contextQuery: "HasState=true",
+    });
+    assert.throws(() => symbolFileBreakpointScope({ contexts: [] }, contexts), /no contexts/);
+    assert.throws(() => symbolFileBreakpointScope({ contexts: ["core-0", "gone"] }, contexts), /'gone' is not/);
 });
 
 // Files for the same context share one MemoryMap.set. A missing file only

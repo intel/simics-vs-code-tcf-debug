@@ -353,7 +353,6 @@ async function pickItemContexts(
         contexts,
         scope: readContextScope(item),
         placeholder: "Check the contexts, or check none for all contexts",
-        allowQuery: true,
         allowTyped: true,
     });
     if (scope === undefined) {

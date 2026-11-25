@@ -6,6 +6,8 @@ export interface BreakpointProperties {
     Enabled?: boolean;
     BreakpointType?: "Software" | "Hardware" | "Auto";
     ContextIds?: string[];
+    /** Installs the breakpoint in the contexts that match this context query. */
+    ContextQuery?: string;
     Location?: string;
     /** Bit set of AccessMode values. */
     AccessMode?: number;
@@ -54,6 +56,7 @@ export interface BreakpointCapabilities {
     /** Bit set of supported AccessMode values. */
     AccessMode?: number;
     ContextIds?: boolean;
+    ContextQuery?: boolean;
     [key: string]: unknown;
 }
 

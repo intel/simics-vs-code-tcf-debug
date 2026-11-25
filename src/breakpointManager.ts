@@ -234,14 +234,23 @@ export class BreakpointManager {
         const caps = await this.capabilities();
         const specs = requested.map((r): BreakpointSpec => {
             const spec: BreakpointSpec = { kind: "function", key: r.name };
-            const { location, contextIds, hasContextDelimiter, hasEmptyContext } = parseFunctionBreakpointName(r.name);
+            const { location, contextIds, contextQuery, hasContextDelimiter, hasEmptyContext } =
+                parseFunctionBreakpointName(r.name);
             if (caps.Location === false) {
                 return { ...spec, error: "The TCF agent does not support breakpoints on expressions" };
             }
             if (hasContextDelimiter && (hasEmptyContext || !location)) {
                 return {
                     ...spec,
-                    error: "Use 'symbol @ context ID' or 'symbol @ ID1, ID2' for a context-scoped function breakpoint",
+                    error:
+                        "Use 'symbol @ context ID', 'symbol @ ID1, ID2' or 'symbol @? context query' " +
+                        "for a context-scoped function breakpoint",
+                };
+            }
+            if (contextQuery !== undefined && caps.ContextQuery === false) {
+                return {
+                    ...spec,
+                    error: "Function breakpoints with a context query require breakpoint ContextQuery support",
                 };
             }
             if (contextIds.length > 0 && caps.ContextIds === false) {
@@ -249,7 +258,11 @@ export class BreakpointManager {
             }
             return this.withCommonProps(
                 spec,
-                { Location: location, ...(contextIds.length > 0 && { ContextIds: contextIds }) },
+                {
+                    Location: location,
+                    ...(contextIds.length > 0 && { ContextIds: contextIds }),
+                    ...(contextQuery !== undefined && { ContextQuery: contextQuery }),
+                },
                 r,
                 caps,
             );

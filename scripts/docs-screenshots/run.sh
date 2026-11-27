@@ -60,10 +60,10 @@ git -C "$repo" archive HEAD docs/images 2>/dev/null | tar -x -C "$work/before" -
 
 # The sandbox hides /home and /tmp and has no network, so that a picture cannot
 # show a path or a host name of this machine, and so that port 1534 is the
-# stand-in agent and never a real one. What the capture needs from /home is kept.
+# stand-in agent and never a real one. Keep only the paths needed for capture.
 keep=()
 for dir in "$repo" "$(dirname "$VSCODE_BIN")" "$(dirname "$(dirname "$(readlink -f "$(command -v node)")")")"; do
-    if [[ "$dir" == /home/* ]]; then
+    if [[ "$dir" == /home/* || "$dir" == /tmp/* ]]; then
         keep+=(--bind "$dir" "$dir")
     fi
 done

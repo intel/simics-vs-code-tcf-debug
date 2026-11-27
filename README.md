@@ -101,3 +101,20 @@ The pictures are screenshots made by a script. When the UI changes, make
 them again as
 [.github/skills/docs-screenshots/SKILL.md](.github/skills/docs-screenshots/SKILL.md)
 describes.
+
+
+<!-- REFERENCES -->
+[getting-started]: https://intel.github.io/simics-vs-code-tcf-debug/getting-started.html
+[call-stack]: https://intel.github.io/simics-vs-code-tcf-debug/debugging/call-stack.html
+[stepping]: https://intel.github.io/simics-vs-code-tcf-debug/debugging/stepping.html
+[breakpoints]: https://intel.github.io/simics-vs-code-tcf-debug/debugging/breakpoints.html
+[variables]: https://intel.github.io/simics-vs-code-tcf-debug/debugging/variables.html
+[disassembly]: https://intel.github.io/simics-vs-code-tcf-debug/debugging/disassembly.html
+[target-memory]: https://intel.github.io/simics-vs-code-tcf-debug/debugging/target-memory.html
+[simics-console]: https://intel.github.io/simics-vs-code-tcf-debug/debugging/simics-console.html
+[snapshots]: https://intel.github.io/simics-vs-code-tcf-debug/debugging/snapshots.html
+[launch]: https://intel.github.io/simics-vs-code-tcf-debug/configuration/launch-configurations.html
+[symbol-files]: https://intel.github.io/simics-vs-code-tcf-debug/configuration/symbol-files.html
+[path-mapping]: https://intel.github.io/simics-vs-code-tcf-debug/configuration/path-mapping.html
+[settings]: https://intel.github.io/simics-vs-code-tcf-debug/configuration/settings.html
+[limitations]: https://intel.github.io/simics-vs-code-tcf-debug/reference/limitations.html

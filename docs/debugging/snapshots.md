@@ -10,6 +10,14 @@ Snapshots need the Simics TCF agent with the snapshot commands of its
 these commands, the view says that snapshots are not available and the
 buttons to take one are disabled.
 
+![The Snapshots view](../images/snapshots.png){width=298}
+
+The buttons in the title of the view are, from the left, **Take Snapshot**,
+**Take Named Snapshot...**, **Delete All Snapshots...** and **Refresh
+Snapshots**. The buttons on a snapshot are **Restore Snapshot** and **Delete
+Snapshot**. They show when the pointer is over the snapshot, or when it is
+selected.
+
 ## Take a snapshot
 
 Use the buttons in the title of the view:

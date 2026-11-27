@@ -20,8 +20,8 @@ session starts.
 ## Open the settings
 
 **Simics Target Debug: Open Settings** in the Command Palette shows the
-settings of the extension in the Settings editor of VS Code. The gear button
-in the title of the Consoles view and of the
+settings of the extension in the Settings editor of VS Code. The **Open
+Settings** button in the title of the Consoles view and of the
 [launch configurations editor](/configuration/launch-configurations#launch-configurations-editor)
 does the same.
 

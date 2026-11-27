@@ -66,6 +66,11 @@ Linux                      group, in the row of the debug configuration
 get no group. The thread of `Other` is next to the groups `Idle` and
 `Threads`, so it gets a row of its own.
 
+In VS Code it looks like this. The thread `init` has stopped at a breakpoint
+and is expanded to show its call stack:
+
+![The example target in the Call Stack view](../images/call-stack.png){width=298}
+
 ## Layout settings
 
 Two settings change the layout. You find them under **Call Stack** in the

@@ -85,6 +85,14 @@ During a debug session, **Path Maps** in Run and Debug lists the session's
 rules in matching order, with the compiled prefix on the left and the host
 destination and contexts beside it.
 
+![The Path Maps view](../images/path-maps.png){width=298}
+
+The buttons in the title of the view are, from the left, **Add Path Map
+Rule...**, **Save Path Map to Debug Configuration** and **Refresh Path
+Map**. The buttons on a rule are **Edit Path Map Rule...** and **Remove Path
+Map Rule**. They show when the pointer is over the rule, or when it is
+selected.
+
 - Use **+** to add a rule.
 - Click a rule to edit its paths and contexts, or use its trash button to
   remove it. The contexts are chosen with the

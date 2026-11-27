@@ -40,6 +40,16 @@ it asks which folder to use, and it creates `launch.json` if there is none.
 The buttons in the editor title switch between the form and the text of
 `launch.json`, and **Open With...** on `launch.json` offers the form too.
 
+![The launch configurations editor with four parts marked](../images/launch-configurations.png)
+
+1. The `simics-target-debug` configurations of `launch.json`, with the
+   buttons **+** and **Delete All** above them.
+2. **Start Debugging**, **Duplicate** and **Delete** for the selected
+   configuration.
+3. The **Contexts** column of a table, see
+   [Symbol files and path map tables](#symbol-files-and-path-map-tables).
+4. **Open launch.json as Text** and **Open Settings** in the editor title.
+
 ### Manage configurations
 
 - The **+** button above the list adds a configuration, and **Delete All**
@@ -63,7 +73,7 @@ The buttons in the editor title switch between the form and the text of
   `connectTimeout`. Others, like `preLaunchTask`, are listed under **Other
   Attributes** when set, and can be edited in the text.
 - The options that apply to all configurations are
-  [settings](/configuration/settings). The gear button in the editor title
+  [settings](/configuration/settings). **Open Settings** in the editor title
   and the link at the end of the form open them.
 
 ### Symbol files and path map tables

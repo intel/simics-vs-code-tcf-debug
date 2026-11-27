@@ -46,6 +46,12 @@ opens the [context picker](/configuration/contexts#the-context-picker), with
 the selected call-stack context as the suggested choice, and then asks for
 the symbol.
 
+![The Breakpoints view with two buttons marked](../images/breakpoints.png){width=298}
+
+The marked buttons in the title of the Breakpoints view are **Add Function
+Breakpoint in Context...** (left) and **Edit Function Breakpoint
+Contexts...** (right). The buttons show when the pointer is over the view.
+
 The contexts are part of the name of the breakpoint, which the Breakpoints
 view shows:
 

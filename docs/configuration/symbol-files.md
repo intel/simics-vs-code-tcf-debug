@@ -50,6 +50,14 @@ whose first loadable segment is linked at 0x3ff000, with `.text` at 0x400000:
 
 ## Add symbol files while debugging
 
+![The Symbol Files view](../images/symbol-files.png){width=298}
+
+The buttons in the title of the **Symbol Files** view are, from the left,
+**Add Symbol File...**, **Save Symbol Files to Debug Configuration** and
+**Reload All Symbol Files**. The buttons on a file are **Edit Symbol
+Mapping...**, **Reload Symbol File** and **Remove Symbol File**. They show
+when the pointer is over the file, or when it is selected.
+
 To add a symbol file after attaching, open **Symbol Files** in Run and Debug
 and use its **+** button, or run **Simics Target Debug: Add Symbol File...**
 from the Command Palette. Enter:

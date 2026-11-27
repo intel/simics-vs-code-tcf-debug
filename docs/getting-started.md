@@ -68,6 +68,22 @@ The debugger uses only standard TCF services. The Simics console and
 [snapshots](/debugging/snapshots) need the Simics agent, and are not
 available with other agents.
 
+## Where to find things
+
+![VS Code during a debug session, with four parts marked](./images/overview.png)
+
+1. The [Call Stack](/debugging/call-stack) view shows the processors,
+   processes and threads of the target.
+2. **Open Target Memory** in the debug toolbar opens the
+   [Target Memory](/debugging/target-memory) view.
+3. The extension adds four views to the Run and Debug side bar:
+   [Path Maps](/configuration/path-mapping#the-path-maps-view),
+   [Symbol Files](/configuration/symbol-files#add-symbol-files-while-debugging),
+   [Consoles](/debugging/simics-console#the-consoles-view) and
+   [Snapshots](/debugging/snapshots). Click a title to open the view.
+4. The [Simics console](/debugging/simics-console) is a terminal in the
+   panel.
+
 ## Next steps
 
 - Source lines, line stepping and variables need symbol files. Load them

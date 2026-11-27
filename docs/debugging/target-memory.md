@@ -3,6 +3,17 @@
 The Target Memory view is a hex view of target memory. Unreadable bytes are
 shown as `??`.
 
+![The Target Memory view with two parts marked](../images/target-memory.png)
+
+1. The toolbar. From the left: the memory to show, the address box, the
+   number of bytes per group, the byte order and the number of bytes per row.
+   The buttons on the right read memory again, open the find box, and show or
+   hide the data inspector.
+2. The data inspector.
+
+The bar at the bottom shows which memory is shown, the address of the cursor,
+and how changed and modified bytes are marked.
+
 ## Open the view
 
 - **Simics Target Debug: Open Target Memory** in the Command Palette, also in

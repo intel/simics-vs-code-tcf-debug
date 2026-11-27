@@ -47,8 +47,12 @@ The syntax is described with the Context Query service in the
 
 ## The context picker
 
-While debugging, the commands that need contexts open the same picker. It
-first offers:
+While debugging, the commands that need contexts open the same picker. This
+is the picker for a new function breakpoint:
+
+![The first step of the context picker](../images/context-picker.png){width=602}
+
+It first offers:
 
 - The current selection, when you edit something that has contexts or a
   query.

@@ -11,8 +11,14 @@ stays open, read-only and grayed out.
 
 The **Consoles** view in the Run and Debug side bar lists the console of each
 agent and its state. Click a console to show it, or to connect it when it is
-not open or disconnected. The gear button in the title of the view opens the
-[settings](/configuration/settings).
+not open or disconnected.
+
+![The Consoles view](../images/consoles.png){width=298}
+
+The button in the title of the view opens the
+[settings](/configuration/settings). The buttons on a console are the lock
+button, which switches the editing keys, and **Clear History**. They show
+when the pointer is over the console, or when it is selected.
 
 ## Options
 

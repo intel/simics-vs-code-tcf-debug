@@ -17,151 +17,36 @@ Debug software running in Simics, or on any other
 The extension uses only standard TCF services, so Simics-specific features
 (the Simics CLI and snapshots) are simply unavailable on other agents.
 
-## Installation
+## Documentation
 
-Build the `.vsix` by running
-```sh
-npm ci
-npm run package
-```
-Then in VS Code run
-**Extensions: Install from VSIX...** and select the generated file.
-
-## Getting started
-
-1. Start a TCF agent in Simics. It listens on port 1534 by default:
-
-   ```
-   simics> new-tcf-agent
-   ```
-
-2. In VS Code, start debugging and select **Simics Target Debug**. Without a
-   `launch.json` this attaches to `localhost:1534`. To configure it, add:
-
-   ```json
-   {
-     "type": "simics-target-debug",
-     "request": "attach",
-     "name": "Attach to TCF agent",
-     "host": "localhost",
-     "port": 1534
-   }
-   ```
-
-**Simics Target Debug: Edit Launch Configurations** edits these
-configurations in a form instead of JSON.
+The user guide is at <https://intel.github.io/simics-vs-code-tcf-debug/>.
+Start with [Getting started][getting-started], which shows how to install
+the extension, start a TCF agent in Simics and attach to it.
 
 ## Features
 
-- **Call stack** – processors, and with OS awareness processes and threads,
-  shown as a tree. Expand a thread to see its stack. Right-click a frame for
-  **Copy Address**.
-- **Stepping** – step over, into and out by source line, or by instruction
-  in the Disassembly view. Line stepping needs symbol files.
-- **Breakpoints** – line, function, data, instruction and logpoints, with
-  conditions and hit counts. Function breakpoints can be limited to some
-  cores, see below.
-- **Variables and watches** – locals, registers, hovers and expressions in
-  the Debug Console, evaluated by the agent in the selected frame.
-- **Disassembly** – right-click a frame and select **Open Disassembly View**.
-- **Target Memory** – a hex editor for target memory: **Simics Target Debug:
-  Open Target Memory**, or **Open in Target Memory** on a variable. Supports
-  editing, search (Ctrl+F) and go to address (Ctrl+G).
-- **Simics CLI** – the Simics command line opens in a terminal after
-  attaching. The **Consoles** view in Run and Debug reconnects it.
-- **Snapshots** – take, restore and delete Simics snapshots from the
-  **Snapshots** view in Run and Debug.
+- **[Call stack][call-stack]** – processors, and with OS awareness processes
+  and threads, shown as a tree.
+- **[Stepping][stepping]** – step over, into and out by source line, or by
+  instruction in the Disassembly view.
+- **[Breakpoints][breakpoints]** – line, function, data, instruction and
+  logpoints, with conditions and hit counts. Function breakpoints can be
+  limited to some cores.
+- **[Variables and expressions][variables]** – locals, registers, hovers and
+  expressions in the Debug Console, evaluated by the agent in the selected
+  frame.
+- **[Disassembly][disassembly]** – the instructions of a stack frame's code,
+  with instruction breakpoints.
+- **[Target Memory][target-memory]** – a hex editor for target memory, with
+  search and go to address.
+- **[Simics console][simics-console]** – the Simics command line in a
+  terminal.
+- **[Snapshots][snapshots]** – take, restore and delete Simics snapshots.
 
-### Function breakpoints for some cores
-
-Run **Simics Target Debug: Add Function Breakpoint in Context...** (also in
-the Breakpoints toolbar and a frame's context menu) and choose the cores.
-You can also type the scope directly in a function breakpoint:
-
-- `start_kernel @ board.cpu[0], board.cpu[1]` – the listed context IDs
-- `start_kernel @? **/HasState=true` – a TCF context query
-
-## Configuration
-
-### Launch configuration
-
-| Attribute        | Default     | Description                                       |
-| ---------------- | ----------- | ------------------------------------------------- |
-| `host`           | `localhost` | Host of the TCF agent                             |
-| `port`           | `1534`      | TCP port of the TCF agent                         |
-| `connectTimeout` | `10000`     | Milliseconds to wait for the agent to answer      |
-| `symbolFiles`    | `[]`        | Symbol files to load, see [below](#symbol-files)  |
-| `pathMap`        | `[]`        | Source path rules, see [below](#path-mapping)     |
-
-### Settings
-
-Options shared by all sessions are VS Code settings. **Simics Target Debug:
-Open Settings** shows them.
-
-| Setting (`simics-target-debug.` ...) | Default | Description                                       |
-| ------------------------------------ | ------- | ------------------------------------------------- |
-| `console.open`                       | `true`  | Open the Simics CLI after attaching               |
-| `console.historySessions`            | `3`     | Earlier sessions shown in the Simics CLI          |
-| `console.editingKeys`                | `true`  | Send editing keys such as Ctrl+P to Simics        |
-| `callStack.hierarchy`                | `true`  | Group threads in the Call Stack view              |
-| `callStack.compact`                  | `true`  | A group that is the only child shares its parent's row |
-| `disassembly.functionHeaders`        | `true`  | Show function names in the Disassembly view       |
-| `tcfTrace.enabled`                   | `false` | Log TCF messages to Output › Simics Target Debug  |
-| `tcfTrace.silence`                   | (list)  | `service/type/name` rules for messages not to log |
-
-Call stack, disassembly and trace settings apply to new sessions.
-
-### Symbol files
-
-Load symbol files when attaching, in addition to `add-symbol-file` in Simics:
-
-```json
-"symbolFiles": [
-  { "path": "${workspaceFolder}/build/firmware.elf" },
-  { "path": "build/app.elf", "contexts": ["board.mb.cpu0.core[0][0]"] },
-  { "path": "build/driver.elf", "contextQuery": "**/HasState=true", "address": "0x40000000" },
-  { "path": "build/module.elf", "address": "0xff000", "absolute": true }
-]
-```
-
-| Property       | Description                                                                 |
-| -------------- | --------------------------------------------------------------------------- |
-| `path`         | ELF file as seen by the agent, relative to the workspace folder             |
-| `contexts`     | Context IDs or names the symbols apply to (default: all)                    |
-| `contextQuery` | A TCF context query instead of `contexts`                                   |
-| `address`      | Offset added to all addresses, like `add-symbol-file -relative`             |
-| `absolute`     | If `true`, `address` is where the first loadable segment is loaded          |
-
-The **Symbol Files** view in Run and Debug adds, edits, reloads and removes
-files during a session, and its save button writes them back to
-`launch.json`. Files loaded elsewhere, for example in Simics, are listed
-under **Added Elsewhere**.
-
-### Path mapping
-
-If the sources are not at the path in the debug information, map the
-compiled path prefix to the local one:
-
-```json
-"pathMap": [
-  { "source": "/build/firmware", "destination": "${workspaceFolder}/firmware" },
-  { "source": "/build/src", "destination": "${workspaceFolder}/cpu0", "contexts": ["cpu0"] }
-]
-```
-
-Rules apply to all contexts unless `contexts` or `contextQuery` is set. When
-a source file is not found, VS Code offers to locate it and creates a rule
-for you. The **Path Maps** view in Run and Debug edits, reorders and saves
-the rules.
-
-## Limitations
-
-- No exception breakpoints.
-- Breakpoints set by other TCF clients or the Simics CLI are not shown.
-- Variables and registers are read-only.
-- `char *` and `char[]` are not shown as strings.
-- No "Restart Frame".
-- Only TCP transport.
+A debug session is set up with a [launch configuration][launch], which can
+load [symbol files][symbol-files] and [map source paths][path-mapping].
+Options shared by all sessions are [settings][settings]. See also the
+[limitations][limitations].
 
 ## Development
 
@@ -200,3 +85,36 @@ To develop in VS Code, open the repository, select **Run Extension** in the
 Run and Debug view and press F5. This starts `npm run watch` and opens an
 Extension Development Host with the extension loaded. **Run Extension
 (Clean)** does the same with all other extensions disabled.
+
+### Documentation
+
+The user guide is a [VitePress](https://vitepress.dev/) site, built from the
+Markdown files in `docs/`.
+
+```sh
+npm run docs:develop       # serve the site, pages reload when edited
+npm run docs:build         # build the site into docs/.vitepress/dist/
+npm run docs:screenshots   # make the pictures in docs/images/ again
+```
+
+The pictures are screenshots made by a script. When the UI changes, make
+them again as
+[.github/skills/docs-screenshots/SKILL.md](.github/skills/docs-screenshots/SKILL.md)
+describes.
+
+
+<!-- REFERENCES -->
+[getting-started]: https://intel.github.io/simics-vs-code-tcf-debug/getting-started.html
+[call-stack]: https://intel.github.io/simics-vs-code-tcf-debug/debugging/call-stack.html
+[stepping]: https://intel.github.io/simics-vs-code-tcf-debug/debugging/stepping.html
+[breakpoints]: https://intel.github.io/simics-vs-code-tcf-debug/debugging/breakpoints.html
+[variables]: https://intel.github.io/simics-vs-code-tcf-debug/debugging/variables.html
+[disassembly]: https://intel.github.io/simics-vs-code-tcf-debug/debugging/disassembly.html
+[target-memory]: https://intel.github.io/simics-vs-code-tcf-debug/debugging/target-memory.html
+[simics-console]: https://intel.github.io/simics-vs-code-tcf-debug/debugging/simics-console.html
+[snapshots]: https://intel.github.io/simics-vs-code-tcf-debug/debugging/snapshots.html
+[launch]: https://intel.github.io/simics-vs-code-tcf-debug/configuration/launch-configurations.html
+[symbol-files]: https://intel.github.io/simics-vs-code-tcf-debug/configuration/symbol-files.html
+[path-mapping]: https://intel.github.io/simics-vs-code-tcf-debug/configuration/path-mapping.html
+[settings]: https://intel.github.io/simics-vs-code-tcf-debug/configuration/settings.html
+[limitations]: https://intel.github.io/simics-vs-code-tcf-debug/reference/limitations.html

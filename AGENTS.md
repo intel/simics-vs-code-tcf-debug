@@ -1,8 +1,9 @@
 # Agent guide
 
 Notes for AI coding agents (and developers) working on this repository. The
-[README](README.md) is the user guide and is shown on the extension's
-Marketplace page; keep implementation details here instead.
+user guide is the documentation site in `docs/`. The [README](README.md) is
+an overview that links to it, and is shown on the extension's Marketplace
+page. Keep implementation details here instead.
 
 ## Commands
 
@@ -17,6 +18,9 @@ npm run test:fuzz          # run the fuzzing tests
 npm run package            # build simics-target-debug-<version>.vsix
 npm run watch              # rebuild on changes
 npm run compile:production # minified bundle without source maps
+npm run docs:develop       # serve the documentation site with hot reload
+npm run docs:build         # build the site, fails on dead links between pages
+npm run docs:screenshots   # make the pictures in docs/images/ again
 npx prettier --write <file>
 ```
 
@@ -24,6 +28,13 @@ npx prettier --write <file>
 
 - Format every TypeScript file you create or change with Prettier, see
   [.github/instructions/typescript.instructions.md](.github/instructions/typescript.instructions.md).
+- The user guide is a VitePress site with one Markdown page per feature in
+  `docs/`, and the sidebar in `docs/.vitepress/config.mts`. When a change is
+  visible to users, update its page. Describe how to use the feature there,
+  not how it works inside.
+- The pictures in `docs/images/` are screenshots made by a script. When a
+  change alters what one of them shows, make them again and have the user
+  review them, see the `docs-screenshots` skill in `.github/skills/`.
 - Unit tests use `node:test` and need no TCF agent. `npm test` only bundles
   and runs `src/test/**/*.test.ts`; the root `test/` folder is neither run nor
   type checked. Add tests in `src/test/`.

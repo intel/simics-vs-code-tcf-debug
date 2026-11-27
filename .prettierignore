@@ -2,5 +2,8 @@ node_modules/
 out/
 build/
 *.vsix
+.tmp/
+docs/.vitepress/cache/
+docs/.vitepress/dist/
 package-lock.json
 *.md

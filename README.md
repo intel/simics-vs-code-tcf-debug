@@ -200,3 +200,14 @@ To develop in VS Code, open the repository, select **Run Extension** in the
 Run and Debug view and press F5. This starts `npm run watch` and opens an
 Extension Development Host with the extension loaded. **Run Extension
 (Clean)** does the same with all other extensions disabled.
+
+### Documentation
+
+The user guide is a [VitePress](https://vitepress.dev/) site, built from the
+Markdown files in `docs/`. It is published on each commit to `main`. When
+you change a feature, update its page.
+
+```sh
+npm run docs:develop   # serve the site, pages reload when edited
+npm run docs:build     # build the site into docs/.vitepress/dist/
+```

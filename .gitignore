@@ -2,3 +2,5 @@ node_modules/
 out/
 build/
 *.vsix
+docs/.vitepress/cache/
+docs/.vitepress/dist/

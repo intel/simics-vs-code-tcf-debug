@@ -151,5 +151,10 @@ Things to know when you change `capture.mjs`:
 - A picture must look the same in every run. Wait for things to settle
   (`scrollbarsFaded()`), and put VS Code into a state that does not depend on
   timing. Settings that help with that go into `SETTINGS` in `vscode.mjs`.
-  Run the script twice to check: both runs must end with the same list, with
-  the same number of pixels for each changed picture.
+  Use `npm run docs:screenshots -- --check-repeatability` to capture twice and
+  compare the two sets of pictures directly, including new pictures. Both
+  sets must contain the same pictures at the same dimensions, with at most
+  10 clearly different pixels per picture. The first set and its log are in
+  `.tmp/docs-screenshots/first-capture/` and `.tmp/docs-screenshots/first-capture.log`;
+  the second set and its log are in `out/` and `capture.log` under the same
+  scratch directory. Only a passing run updates `docs/images/`.

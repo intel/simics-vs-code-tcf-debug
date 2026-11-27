@@ -22,6 +22,7 @@ if (process.env.SHOTS_SANDBOX !== "1") {
 const out = process.env.SHOTS_OUT;
 /** The pictures of the last commit, to tell which ones changed. */
 const before = process.env.SHOTS_BEFORE;
+const firstCapture = process.env.SHOTS_FIRST_CAPTURE;
 /** A picture with at most this many clearly different pixels counts as unchanged. */
 const NOISE = 10;
 fs.mkdirSync(path.join(out, "raw"), { recursive: true });
@@ -364,13 +365,13 @@ async function webview(selector) {
 }
 
 /**
- * How many pixels of a new picture differ clearly from the committed one:
- * undefined without a committed one, -1 if the sizes differ. The same view
+ * How many pixels of a picture differ clearly from a reference picture:
+ * undefined without a reference, -1 if the sizes differ. The same view
  * can differ in a pixel or two between runs, and that changes the colours
  * that compressing picks, so small differences in colour are not counted.
  */
-async function changedPixels(file, committed) {
-    if (!fs.existsSync(committed)) {
+async function changedPixels(file, reference) {
+    if (!fs.existsSync(reference)) {
         return undefined;
     }
     return page.evaluate(
@@ -395,7 +396,7 @@ async function changedPixels(file, committed) {
             }
             return count;
         },
-        [file, committed].map((f) => fs.readFileSync(f).toString("base64")),
+        [file, reference].map((f) => fs.readFileSync(f).toString("base64")),
     );
 }
 
@@ -791,6 +792,21 @@ try {
         const note = pixels === undefined ? "" : pixels < 0 ? "other size" : `${pixels} pixels differ`;
         console.log(`  ${name}.png: ${state}${note && ` (${note})`}`);
         changes.push(`${name}.png\t${state}\t${note}\n`);
+    }
+    if (firstCapture) {
+        const missing = new Set(fs.readdirSync(firstCapture).filter((name) => name.endsWith(".png")));
+        const differences = [];
+        for (const name of shots) {
+            const file = `${name}.png`;
+            missing.delete(file);
+            const pixels = await changedPixels(path.join(out, file), path.join(firstCapture, file));
+            if (pixels === undefined) differences.push(`${file}: missing from first capture`);
+            else if (pixels < 0) differences.push(`${file}: different dimensions`);
+            else if (pixels > NOISE) differences.push(`${file}: ${pixels} pixels differ`);
+        }
+        for (const file of missing) differences.push(`${file}: missing from second capture`);
+        if (differences.length > 0) throw new Error(`captures are not repeatable:\n  ${differences.join("\n  ")}`);
+        console.log(`Repeatability check passed (${shots.length} pictures, at most ${NOISE} different pixels each)`);
     }
     fs.writeFileSync(path.join(out, "changes.txt"), changes.join(""));
 } catch (err) {

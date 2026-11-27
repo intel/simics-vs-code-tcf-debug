@@ -9,6 +9,14 @@ tool="$repo/scripts/docs-screenshots"
 work="$repo/.tmp/docs-screenshots"
 images="$repo/docs/images"
 
+repeatability=false
+if [[ $# -eq 1 && "$1" == --check-repeatability ]]; then
+    repeatability=true
+elif [[ $# -ne 0 ]]; then
+    echo "Usage: npm run docs:screenshots -- [--check-repeatability]" >&2
+    exit 2
+fi
+
 for cmd in bwrap xvfb-run pngquant curl tar sha256sum git node npm; do
     if ! command -v "$cmd" >/dev/null; then
         echo "$cmd is needed, but it is not installed." >&2
@@ -45,9 +53,8 @@ fi
 # The pictures show the extension as it is in the working tree.
 (cd "$repo" && npm run --silent compile)
 
-rm -rf "${work:?}/workspace" "${work:?}/home" "${work:?}/out" "${work:?}/before"
-mkdir -p "$work/home" "$work/out" "$work/before"
-cp -r "$tool/workspace" "$work/workspace"
+rm -rf "${work:?}/before"
+mkdir -p "$work/before"
 # The pictures of the last commit, to tell which ones change.
 git -C "$repo" archive HEAD docs/images 2>/dev/null | tar -x -C "$work/before" --strip-components=2 2>/dev/null || true
 
@@ -60,14 +67,30 @@ for dir in "$repo" "$(dirname "$VSCODE_BIN")" "$(dirname "$(dirname "$(readlink 
         keep+=(--bind "$dir" "$dir")
     fi
 done
-bwrap --bind / / --dev-bind /dev /dev --proc /proc --tmpfs /tmp \
-    --tmpfs /home --bind "$work/home" /home/user --bind "$work/workspace" /home/user/server \
-    "${keep[@]}" \
-    --unshare-net --unshare-pid --die-with-parent \
-    --setenv HOME /home/user --setenv SHOTS_SANDBOX 1 --setenv VSCODE_BIN "$VSCODE_BIN" \
-    --setenv SHOTS_WORKSPACE /home/user/server --setenv SHOTS_WORK "$work" \
-    --setenv SHOTS_OUT "$work/out" --setenv SHOTS_BEFORE "$work/before" \
-    xvfb-run -a -s "-screen 0 2600x2000x24" node "$tool/capture.mjs" 2>&1 | tee "$work/capture.log"
+
+capture() {
+    local first_capture="${1:-}"
+    rm -rf "${work:?}/workspace" "${work:?}/home" "${work:?}/out"
+    mkdir -p "$work/home" "$work/out"
+    cp -r "$tool/workspace" "$work/workspace"
+    bwrap --bind / / --dev-bind /dev /dev --proc /proc --tmpfs /tmp \
+        --tmpfs /home --bind "$work/home" /home/user --bind "$work/workspace" /home/user/server \
+        "${keep[@]}" \
+        --unshare-net --unshare-pid --die-with-parent \
+        --setenv HOME /home/user --setenv SHOTS_SANDBOX 1 --setenv VSCODE_BIN "$VSCODE_BIN" \
+        --setenv SHOTS_WORKSPACE /home/user/server --setenv SHOTS_WORK "$work" \
+        --setenv SHOTS_OUT "$work/out" --setenv SHOTS_BEFORE "$work/before" \
+        --setenv SHOTS_FIRST_CAPTURE "$first_capture" \
+        xvfb-run -a -s "-screen 0 2600x2000x24" node "$tool/capture.mjs" 2>&1 | tee "$work/capture.log"
+}
+
+capture
+if "$repeatability"; then
+    rm -rf "${work:?}/first-capture"
+    mv "$work/out" "$work/first-capture"
+    mv "$work/capture.log" "$work/first-capture.log"
+    capture "$work/first-capture"
+fi
 
 # Pictures that changed go to docs/images.
 echo

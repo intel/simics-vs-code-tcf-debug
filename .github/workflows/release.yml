@@ -100,7 +100,6 @@ jobs:
               run: sed -i '/^## \[Unreleased\]$/,/^$/{/^## \[Unreleased\]$/d;/^$/d;}' CHANGELOG.md
 
             - name: Package extension
-              id: package
               run: npm run package -- --out "simics-target-debug-${{ steps.version.outputs.new_version }}.vsix"
 
             - name: Build release notes
@@ -121,20 +120,8 @@ jobs:
               env:
                   GH_TOKEN: ${{ github.token }}
                   TAG: ${{ steps.version.outputs.tag }}
-                  VSIX: simics-target-debug-${{ steps.version.outputs.new_version }}.vsix
               run: |
                   gh release create "$TAG" \
                     --verify-tag \
                     --title "$TAG" \
-                    --notes-file "$RUNNER_TEMP/release-notes.md" \
-                    "$VSIX"
-
-            - name: Upload release artifacts
-              if: ${{ !cancelled() && steps.package.outcome == 'success' }}
-              uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-              with:
-                  name: simics-target-debug-${{ steps.version.outputs.new_version }}
-                  path: |
-                      simics-target-debug-${{ steps.version.outputs.new_version }}.vsix
-                      ${{ runner.temp }}/release-notes.md
-                  if-no-files-found: error
+                    --notes-file "$RUNNER_TEMP/release-notes.md"

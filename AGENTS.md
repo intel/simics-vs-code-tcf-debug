@@ -20,6 +20,7 @@ npm run watch              # rebuild on changes
 npm run compile:production # minified bundle without source maps
 npm run docs:develop       # serve the documentation site with hot reload
 npm run docs:build         # build the site, fails on dead links between pages
+npm run docs:screenshots   # make the pictures in docs/images/ again
 npx prettier --write <file>
 ```
 
@@ -31,6 +32,9 @@ npx prettier --write <file>
   `docs/`, and the sidebar in `docs/.vitepress/config.mts`. When a change is
   visible to users, update its page. Describe how to use the feature there,
   not how it works inside.
+- The pictures in `docs/images/` are screenshots made by a script. When a
+  change alters what one of them shows, make them again and have the user
+  review them, see the `docs-screenshots` skill in `.github/skills/`.
 - Unit tests use `node:test` and need no TCF agent. `npm test` only bundles
   and runs `src/test/**/*.test.ts`; the root `test/` folder is neither run nor
   type checked. Add tests in `src/test/`.

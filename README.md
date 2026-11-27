@@ -92,6 +92,12 @@ The user guide is a [VitePress](https://vitepress.dev/) site, built from the
 Markdown files in `docs/`.
 
 ```sh
-npm run docs:develop   # serve the site, pages reload when edited
-npm run docs:build     # build the site into docs/.vitepress/dist/
+npm run docs:develop       # serve the site, pages reload when edited
+npm run docs:build         # build the site into docs/.vitepress/dist/
+npm run docs:screenshots   # make the pictures in docs/images/ again
 ```
+
+The pictures are screenshots made by a script. When the UI changes, make
+them again as
+[.github/skills/docs-screenshots/SKILL.md](.github/skills/docs-screenshots/SKILL.md)
+describes.

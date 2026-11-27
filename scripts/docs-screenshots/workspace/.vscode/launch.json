@@ -1,0 +1,31 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "simics-target-debug",
+            "request": "attach",
+            "name": "Attach to Simics",
+            "host": "localhost",
+            "port": 1534,
+            "symbolFiles": [
+                { "path": "${workspaceFolder}/build/server.elf", "contextQuery": "**/HasState=true" },
+                { "path": "${workspaceFolder}/build/driver.ko", "address": "0xffffffffa0000000" }
+            ],
+            "pathMap": [
+                { "source": "/build/server", "destination": "${workspaceFolder}" },
+                {
+                    "source": "/build/libs",
+                    "destination": "${workspaceFolder}/libs",
+                    "contextQuery": "**/HasState=true"
+                }
+            ]
+        },
+        {
+            "type": "simics-target-debug",
+            "request": "attach",
+            "name": "Attach to lab server",
+            "host": "simics-lab.example.com",
+            "port": 1534
+        }
+    ]
+}

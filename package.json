@@ -1014,7 +1014,8 @@
         "vscode:prepublish": "npm run typecheck && npm run compile:production",
         "package": "vsce package --no-dependencies",
         "docs:develop": "vitepress dev docs",
-        "docs:build": "vitepress build docs"
+        "docs:build": "vitepress build docs",
+        "docs:screenshots": "bash scripts/docs-screenshots/run.sh"
     },
     "dependencies": {
         "@vscode/debugadapter": "^1.68.0",
@@ -1032,6 +1033,7 @@
         "@vscode/vsce": "^4.1.0",
         "esbuild": "^0.28.2",
         "fast-check": "4.10.2",
+        "playwright-core": "^1.65.1",
         "prettier": "^3.9.10",
         "typescript": "^7.0.2",
         "vitepress": "2.0.0-alpha.21"
